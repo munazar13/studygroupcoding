@@ -1,0 +1,42 @@
+[
+  {
+    "id": "founder-munazar",
+    "name": "Munazar",
+    "role": "Founder",
+    "subtitle": "Code Architect",
+    "skill": "Konsep, arah belajar, dan pengembangan sistem",
+    "image": "./images/founders/founder-1.svg"
+  },
+  {
+    "id": "leader-alfithani",
+    "name": "Alfithani Ninoersy",
+    "role": "Ketua Umum",
+    "subtitle": "Guild Leader",
+    "skill": "Koordinasi anggota dan program kerja",
+    "image": "./images/founders/founder-2.svg"
+  },
+  {
+    "id": "secretary-dzaky",
+    "name": "Teuku Ahmad Dzaky",
+    "role": "Sekretaris 1",
+    "subtitle": "Quest Scribe",
+    "skill": "Administrasi dan dokumentasi kegiatan",
+    "image": "./images/founders/founder-3.svg"
+  },
+  {
+    "id": "secretary-syifa",
+    "name": "Syifa Nur Afifah",
+    "role": "Sekretaris 2",
+    "subtitle": "Archive Keeper",
+    "skill": "Catatan program dan pengarsipan komunitas",
+    "image": "./images/founders/founder-4.svg"
+  },
+  {
+    "id": "treasurer-zirly",
+    "name": "Zirly Azzahra",
+    "role": "Bendahara",
+    "subtitle": "Coin Keeper",
+    "skill": "Pengelolaan kebutuhan kegiatan",
+    "image": "./images/founders/founder-5.svg"
+  }
+]

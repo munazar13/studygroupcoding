@@ -1,0 +1,16 @@
+.pixel-card,
+.pixel-button,
+.stat-card,
+input,
+textarea,
+select,
+.top-nav,
+.bottom-nav,
+.page-hero {
+  image-rendering: pixelated;
+}
+
+.pixel-card::selection,
+.pixel-button::selection {
+  background: var(--gold);
+}

@@ -1,0 +1,95 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function memberPath(uid) {
+      return /databases/$(database)/documents/members/$(uid);
+    }
+
+    function myMember() {
+      return get(memberPath(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(memberPath(request.auth.uid)) && myMember().data.role == 'admin' && myMember().data.status == 'approved';
+    }
+
+    function isApproved() {
+      return signedIn() && exists(memberPath(request.auth.uid)) && myMember().data.status == 'approved';
+    }
+
+    match /members/{uid} {
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'member'
+        && request.resource.data.status == 'pending';
+
+      allow read: if isAdmin() || isApproved() || (signedIn() && request.auth.uid == uid);
+
+      allow update: if isAdmin()
+        || (
+          signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.status == resource.data.status
+        );
+
+      allow delete: if isAdmin();
+    }
+
+    match /courses/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /ranks/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /rewards/{id} {
+      allow read: if isApproved() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /courseSections/{id} {
+      allow read: if isApproved() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /questions/{id} {
+      allow read: if isApproved() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /founders/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /events/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /docs/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /projects/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /activity/{id} {
+      allow read: if isApproved() || isAdmin();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,149 @@
+@media (max-width: 980px) {
+  .desktop-links {
+    display: none;
+  }
+
+  .hero-section,
+  .dashboard-hero,
+  .two-column,
+  .about-layout,
+  .admin-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .founder-grid,
+  .card-grid,
+  .reward-grid,
+  .documentation-grid,
+  .learning-map-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .page-shell {
+    width: min(100% - 1rem, 640px);
+    padding-top: 1rem;
+    padding-bottom: 6.5rem;
+  }
+
+  .top-nav {
+    width: calc(100% - 0.7rem);
+    align-items: center;
+    padding: 0.6rem;
+  }
+
+  .brand span {
+    max-width: 150px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .nav-actions {
+    gap: 0.35rem;
+  }
+
+  .small-link,
+  .pixel-button {
+    min-height: 44px;
+  }
+
+  .bottom-nav {
+    display: grid;
+  }
+
+  .hero-copy,
+  .page-hero,
+  .pixel-card,
+  .stat-card {
+    border-radius: 18px;
+    padding: 1rem;
+  }
+
+  .hero-copy h1,
+  .compact-hero h1 {
+    font-size: clamp(2rem, 12vw, 3.3rem);
+  }
+
+  .founder-grid,
+  .card-grid,
+  .reward-grid,
+  .documentation-grid,
+  .learning-map-grid,
+  .form-grid,
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-actions,
+  .result-actions,
+  .quiz-controls,
+  .member-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pixel-button,
+  .hero-actions a,
+  .result-actions a {
+    width: 100%;
+  }
+
+  .chest-item,
+  .leader-row {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .answer-option {
+    min-height: 58px;
+    text-align: center;
+  }
+
+  .material-card p,
+  .pixel-card p {
+    font-size: 0.98rem;
+  }
+
+  .tabbar {
+    overflow-x: auto;
+    padding-bottom: 0.3rem;
+    flex-wrap: nowrap;
+  }
+
+  .tabbar button {
+    flex: 0 0 auto;
+  }
+
+  .site-footer {
+    display: none;
+  }
+
+  .toast {
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 5.9rem;
+  }
+}
+
+@media print {
+  .top-nav,
+  .bottom-nav,
+  .site-footer,
+  .pixel-button {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+  }
+
+  .certificate-card {
+    box-shadow: none;
+  }
+}

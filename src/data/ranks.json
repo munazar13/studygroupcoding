@@ -1,0 +1,15 @@
+[
+  {"id":"rookie-coder","name":"Rookie Coder","minXp":0},
+  {"id":"logic-runner","name":"Logic Runner","minXp":250},
+  {"id":"flowchart-scout","name":"Flowchart Scout","minXp":550},
+  {"id":"data-keeper","name":"Data Keeper","minXp":900},
+  {"id":"web-explorer","name":"Web Explorer","minXp":1300},
+  {"id":"page-builder","name":"Page Builder","minXp":1800},
+  {"id":"script-fighter","name":"Script Fighter","minXp":2400},
+  {"id":"frontend-warrior","name":"Frontend Warrior","minXp":3100},
+  {"id":"backend-apprentice","name":"Backend Apprentice","minXp":3900},
+  {"id":"php-ranger","name":"PHP Ranger","minXp":4800},
+  {"id":"database-keeper","name":"Database Keeper","minXp":5800},
+  {"id":"crud-guardian","name":"CRUD Guardian","minXp":7000},
+  {"id":"code-adventurer","name":"Code Adventurer","minXp":8500}
+]

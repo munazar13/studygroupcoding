@@ -1,0 +1,37 @@
+[
+  {
+    "id": "final-1",
+    "question": "Sebuah aplikasi data anggota membutuhkan fitur menambah, melihat, mengedit, dan menghapus data. Konsep apa yang paling tepat?",
+    "options": ["CRUD", "Flexbox", "Heading", "Color palette"],
+    "correctIndex": 0,
+    "explanation": "CRUD adalah alur dasar untuk mengelola data aplikasi."
+  },
+  {
+    "id": "final-2",
+    "question": "Urutan yang paling masuk akal untuk menyimpan data form ke database adalah...",
+    "options": ["Validasi input → koneksi database → query INSERT → tampilkan feedback", "Query DELETE → hapus form → desain logo", "Buka CSS → ubah warna → selesai", "Matikan server → tulis HTML"],
+    "correctIndex": 0,
+    "explanation": "Input perlu dicek, koneksi dibuat, data disimpan, lalu pengguna diberi feedback."
+  },
+  {
+    "id": "final-3",
+    "question": "Jika data tidak muncul dari database, langkah debugging awal yang paling baik adalah...",
+    "options": ["Periksa koneksi dan query SELECT", "Ganti semua warna website", "Hapus seluruh project", "Ubah nama laptop"],
+    "correctIndex": 0,
+    "explanation": "Data tidak muncul sering berkaitan dengan koneksi database atau query SELECT."
+  },
+  {
+    "id": "final-4",
+    "question": "Fitur login sederhana biasanya membutuhkan...",
+    "options": ["Form input, validasi, pengecekan data akun", "Hanya gambar background", "Satu file CSS kosong", "Tag paragraf saja"],
+    "correctIndex": 0,
+    "explanation": "Login memerlukan input dan proses pencocokan data akun."
+  },
+  {
+    "id": "final-5",
+    "question": "Primary key penting dalam tabel karena...",
+    "options": ["Membedakan setiap baris data secara unik", "Membuat tombol jadi biru", "Mengganti font browser", "Menghapus semua query"],
+    "correctIndex": 0,
+    "explanation": "Primary key membuat tiap data mudah dicari, diedit, atau dihapus."
+  }
+]

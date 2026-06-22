@@ -1,0 +1,614 @@
+[
+  {
+    "id": "new-coder",
+    "name": "Mengenal Dunia Coding Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 1,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Mengenal Dunia Coding.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-1-chest",
+    "name": "Peti Stage 1",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 1,
+    "description": "Peti hadiah setelah menyelesaikan Mengenal Dunia Coding. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "logic-spark",
+    "name": "Cara Berpikir Komputasional Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 2,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Cara Berpikir Komputasional.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-2-chest",
+    "name": "Peti Stage 2",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 2,
+    "description": "Peti hadiah setelah menyelesaikan Cara Berpikir Komputasional. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "logic-rookie",
+    "name": "Algoritma Dasar Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 3,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Algoritma Dasar.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-3-chest",
+    "name": "Peti Stage 3",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 3,
+    "description": "Peti hadiah setelah menyelesaikan Algoritma Dasar. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "flowchart-scout",
+    "name": "Flowchart dan Pseudocode Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 4,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Flowchart dan Pseudocode.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-4-chest",
+    "name": "Peti Stage 4",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 4,
+    "description": "Peti hadiah setelah menyelesaikan Flowchart dan Pseudocode. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "data-starter",
+    "name": "Variabel dan Tipe Data Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 5,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Variabel dan Tipe Data.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-5-chest",
+    "name": "Peti Stage 5",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 5,
+    "description": "Peti hadiah setelah menyelesaikan Variabel dan Tipe Data. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "operator-initiate",
+    "name": "Operator Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 6,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Operator.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-6-chest",
+    "name": "Peti Stage 6",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 6,
+    "description": "Peti hadiah setelah menyelesaikan Operator. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "ipo-keeper",
+    "name": "Input, Proses, Output Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 7,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Input, Proses, Output.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-7-chest",
+    "name": "Peti Stage 7",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 7,
+    "description": "Peti hadiah setelah menyelesaikan Input, Proses, Output. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "decision-maker",
+    "name": "Percabangan If Else Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 8,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Percabangan If Else.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-8-chest",
+    "name": "Peti Stage 8",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 8,
+    "description": "Peti hadiah setelah menyelesaikan Percabangan If Else. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "logic-brancher",
+    "name": "Percabangan Bertingkat Badge",
+    "type": "Badge",
+    "rarity": "Common",
+    "levelRequired": 9,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Percabangan Bertingkat.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-9-chest",
+    "name": "Peti Stage 9",
+    "type": "Treasure",
+    "rarity": "Common",
+    "levelRequired": 9,
+    "description": "Peti hadiah setelah menyelesaikan Percabangan Bertingkat. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "loop-runner",
+    "name": "Perulangan Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 10,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Perulangan.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-10-chest",
+    "name": "Peti Stage 10",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 10,
+    "description": "Peti hadiah setelah menyelesaikan Perulangan. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "array-keeper",
+    "name": "Array Dasar Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 11,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Array Dasar.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-11-chest",
+    "name": "Peti Stage 11",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 11,
+    "description": "Peti hadiah setelah menyelesaikan Array Dasar. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "function-crafter",
+    "name": "Function Dasar Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 12,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Function Dasar.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-12-chest",
+    "name": "Peti Stage 12",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 12,
+    "description": "Peti hadiah setelah menyelesaikan Function Dasar. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "web-explorer",
+    "name": "Cara Kerja Website Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 13,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Cara Kerja Website.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-13-chest",
+    "name": "Peti Stage 13",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 13,
+    "description": "Peti hadiah setelah menyelesaikan Cara Kerja Website. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "folder-architect",
+    "name": "Struktur Project Web Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 14,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Struktur Project Web.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-14-chest",
+    "name": "Peti Stage 14",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 14,
+    "description": "Peti hadiah setelah menyelesaikan Struktur Project Web. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "html-rookie",
+    "name": "HTML Dasar Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 15,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar HTML Dasar.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-15-chest",
+    "name": "Peti Stage 15",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 15,
+    "description": "Peti hadiah setelah menyelesaikan HTML Dasar. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "html-builder",
+    "name": "HTML Lanjutan Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 16,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar HTML Lanjutan.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-16-chest",
+    "name": "Peti Stage 16",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 16,
+    "description": "Peti hadiah setelah menyelesaikan HTML Lanjutan. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "css-starter",
+    "name": "CSS Dasar Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 17,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar CSS Dasar.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-17-chest",
+    "name": "Peti Stage 17",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 17,
+    "description": "Peti hadiah setelah menyelesaikan CSS Dasar. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "layout-pass",
+    "name": "Layout CSS Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 18,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Layout CSS.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-18-chest",
+    "name": "Peti Stage 18",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 18,
+    "description": "Peti hadiah setelah menyelesaikan Layout CSS. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "responsive-builder",
+    "name": "Responsive Design Badge",
+    "type": "Badge",
+    "rarity": "Rare",
+    "levelRequired": 19,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Responsive Design.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-19-chest",
+    "name": "Peti Stage 19",
+    "type": "Treasure",
+    "rarity": "Rare",
+    "levelRequired": 19,
+    "description": "Peti hadiah setelah menyelesaikan Responsive Design. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "js-starter",
+    "name": "JavaScript Dasar Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 20,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar JavaScript Dasar.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-20-chest",
+    "name": "Peti Stage 20",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 20,
+    "description": "Peti hadiah setelah menyelesaikan JavaScript Dasar. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "event-tamer",
+    "name": "Function dan Event Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 21,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Function dan Event.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-21-chest",
+    "name": "Peti Stage 21",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 21,
+    "description": "Peti hadiah setelah menyelesaikan Function dan Event. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "dom-mage",
+    "name": "DOM Manipulation Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 22,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar DOM Manipulation.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-22-chest",
+    "name": "Peti Stage 22",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 22,
+    "description": "Peti hadiah setelah menyelesaikan DOM Manipulation. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "form-guardian",
+    "name": "Validasi Form Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 23,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Validasi Form.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-23-chest",
+    "name": "Peti Stage 23",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 23,
+    "description": "Peti hadiah setelah menyelesaikan Validasi Form. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "storage-keeper",
+    "name": "Local Storage Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 24,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Local Storage.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-24-chest",
+    "name": "Peti Stage 24",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 24,
+    "description": "Peti hadiah setelah menyelesaikan Local Storage. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "backend-explorer",
+    "name": "Mengenal Backend Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 25,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Mengenal Backend.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-25-chest",
+    "name": "Peti Stage 25",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 25,
+    "description": "Peti hadiah setelah menyelesaikan Mengenal Backend. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "php-rookie",
+    "name": "Pengenalan PHP Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 26,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Pengenalan PHP.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-26-chest",
+    "name": "Peti Stage 26",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 26,
+    "description": "Peti hadiah setelah menyelesaikan Pengenalan PHP. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "php-apprentice",
+    "name": "Variabel dan Operator PHP Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 27,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Variabel dan Operator PHP.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-27-chest",
+    "name": "Peti Stage 27",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 27,
+    "description": "Peti hadiah setelah menyelesaikan Variabel dan Operator PHP. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "php-logic",
+    "name": "Percabangan dan Perulangan PHP Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 28,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Percabangan dan Perulangan PHP.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-28-chest",
+    "name": "Peti Stage 28",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 28,
+    "description": "Peti hadiah setelah menyelesaikan Percabangan dan Perulangan PHP. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "php-form-handler",
+    "name": "Form dengan PHP Badge",
+    "type": "Badge",
+    "rarity": "Epic",
+    "levelRequired": 29,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Form dengan PHP.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-29-chest",
+    "name": "Peti Stage 29",
+    "type": "Treasure",
+    "rarity": "Epic",
+    "levelRequired": 29,
+    "description": "Peti hadiah setelah menyelesaikan Form dengan PHP. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "database-rookie",
+    "name": "Konsep Database Badge",
+    "type": "Badge",
+    "rarity": "Legendary",
+    "levelRequired": 30,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar Konsep Database.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-30-chest",
+    "name": "Peti Stage 30",
+    "type": "Treasure",
+    "rarity": "Legendary",
+    "levelRequired": 30,
+    "description": "Peti hadiah setelah menyelesaikan Konsep Database. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "sql-reader",
+    "name": "SQL Dasar Badge",
+    "type": "Badge",
+    "rarity": "Legendary",
+    "levelRequired": 31,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar SQL Dasar.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-31-chest",
+    "name": "Peti Stage 31",
+    "type": "Treasure",
+    "rarity": "Legendary",
+    "levelRequired": 31,
+    "description": "Peti hadiah setelah menyelesaikan SQL Dasar. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "backend-builder",
+    "name": "PHP dan MySQL Badge",
+    "type": "Badge",
+    "rarity": "Legendary",
+    "levelRequired": 32,
+    "description": "Lencana untuk membuktikan kamu sudah menguasai dasar PHP dan MySQL.",
+    "icon": "badge"
+  },
+  {
+    "id": "stage-32-chest",
+    "name": "Peti Stage 32",
+    "type": "Treasure",
+    "rarity": "Legendary",
+    "levelRequired": 32,
+    "description": "Peti hadiah setelah menyelesaikan PHP dan MySQL. Buka untuk mendapatkan XP, koin, atau item profil.",
+    "icon": "chest"
+  },
+  {
+    "id": "golden-frame",
+    "name": "Golden Profile Frame",
+    "type": "Frame",
+    "rarity": "Legendary",
+    "levelRequired": 28,
+    "description": "Frame profil emas untuk anggota yang sudah mendekati backend akhir.",
+    "icon": "frame"
+  },
+  {
+    "id": "sql-crown",
+    "name": "SQL Crown",
+    "type": "Title",
+    "rarity": "Legendary",
+    "levelRequired": 31,
+    "description": "Crown untuk anggota yang berhasil membaca query SQL dasar.",
+    "icon": "crown"
+  },
+  {
+    "id": "backend-title",
+    "name": "Backend Builder Title",
+    "type": "Title",
+    "rarity": "Legendary",
+    "levelRequired": 32,
+    "description": "Title khusus setelah menyelesaikan PHP dan MySQL.",
+    "icon": "trophy"
+  },
+  {
+    "id": "certificate-crown",
+    "name": "Victory Certificate Crown",
+    "type": "Certificate",
+    "rarity": "Legendary",
+    "levelRequired": 33,
+    "description": "Reward akhir setelah Final Quest selesai.",
+    "icon": "crown"
+  }
+]
