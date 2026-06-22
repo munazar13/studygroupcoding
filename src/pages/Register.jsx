@@ -76,7 +76,7 @@ export default function Register() {
             Angkatan
             <input
               required
-              placeholder="Format: Letting 25 / PTI 2025"
+              placeholder="Format: 25"
               value={form.cohort}
               onChange={(event) => setForm({ ...form, cohort: event.target.value })}
             />
