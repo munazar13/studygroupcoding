@@ -18,22 +18,55 @@ function normalizeMember(member) {
   }
 
   return {
-    role: 'member',
-    status: 'pending',
-    xp: 0,
-    coins: 0,
-    streak: 0,
-    currentStage: 1,
-    completedCourses: [],
-    passedStages: [],
-    badges: [],
-    unlockedRewards: [],
-    unopenedChests: [],
-    chestHistory: [],
-    quizHistory: [],
-    finalQuestComplete: false,
-    ...member
-  };
+  role: 'member',
+  status: 'pending',
+
+  level: 1,
+  xp: 0,
+  xpToNextLevel: 100,
+  totalXp: 0,
+  coins: 0,
+  streak: 0,
+
+  currentStage: 1,
+  completedCourses: [],
+  completedStages: [],
+  passedStages: [],
+  stageProgress: {},
+
+  badges: [],
+  titles: [],
+  frames: [],
+  avatars: [],
+
+  ownedBadges: [],
+  ownedTitles: [],
+  ownedFrames: [],
+  ownedAvatars: [],
+
+  activeBadge: '',
+  activeTitle: '',
+  activeFrame: '',
+  activeAvatar: '',
+
+  unlockedRewards: [],
+  unopenedChests: [],
+  openedChests: [],
+  chestHistory: [],
+  coinTransactions: [],
+  quizHistory: [],
+  activityLogs: [],
+  challengeSubmissions: [],
+  completedChallenges: [],
+  challengeRewardHistory: [],
+  lastChallengeReward: null,
+
+  finalQuestComplete: false,
+  certificateCode: '',
+  lastStudyDate: '',
+
+  ...member
+};
 }
 
 export function AuthProvider({ children }) {

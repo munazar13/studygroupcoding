@@ -1,18 +1,73 @@
 import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PixelCard from '../components/PixelCard';
-import PixelButton from '../components/PixelButton';
 import StatCard from '../components/StatCard';
 import LoadingState from '../components/LoadingState';
 import { loadPublicData } from '../services/dataApi';
 import { useAuth } from '../context/AuthContext';
+
 import SetupNotice from '../components/SetupNotice';
+
+function isChallengeActive(challenge) {
+  const today = new Date();
+  const startDate = challenge.startDate ? new Date(challenge.startDate) : null;
+  const endDate = challenge.endDate ? new Date(challenge.endDate) : null;
+
+  if (startDate && today < startDate) return false;
+  if (endDate && today > endDate) return false;
+
+  return challenge.published !== false && challenge.featuredOnHome !== false;
+}
+
+function getRewardText(challenge) {
+  if (challenge.rewardType === 'coins') {
+    return `🪙 ${challenge.rewardCoins || 0} koin`;
+  }
+
+  if (challenge.rewardType === 'xp') {
+    return `⭐ ${challenge.rewardXp || 0} XP`;
+  }
+
+  if (challenge.rewardType === 'badge') {
+    return `${challenge.rewardIcon || '🏅'} Badge: ${challenge.rewardName || 'Badge'}`;
+  }
+
+  if (challenge.rewardType === 'title') {
+    return `${challenge.rewardIcon || '🎖️'} Title: ${challenge.rewardName || 'Title'}`;
+  }
+
+  if (challenge.rewardType === 'chest') {
+    return `${challenge.rewardIcon || '🎁'} Chest: ${challenge.rewardName || 'Chest'}`;
+  }
+
+  return 'Reward';
+}
+
+function formatChallengeDate(challenge) {
+  if (!challenge.startDate && !challenge.endDate) {
+    return 'Tanpa batas waktu';
+  }
+
+  if (challenge.startDate && challenge.endDate) {
+    return `${challenge.startDate} sampai ${challenge.endDate}`;
+  }
+
+  if (challenge.startDate) {
+    return `Mulai ${challenge.startDate}`;
+  }
+
+  return `Berakhir ${challenge.endDate}`;
+}
+
+
+
 
 export default function Home() {
   const { firebaseConfigured } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-
+  
+  
   useEffect(() => {
     if (!firebaseConfigured) {
       setLoading(false);
@@ -21,9 +76,21 @@ export default function Home() {
 
     loadPublicData()
       .then(setData)
-      .catch(() => setData({ founders: [], events: [], docs: [], projects: [] }))
+      .catch(() => setData({
+        founders: [],
+        events: [],
+        docs: [],
+        projects: [],
+        challenges: []
+      }))
       .finally(() => setLoading(false));
   }, [firebaseConfigured]);
+
+  const activeChallenges = useMemo(() => {
+    return (data?.challenges || []).filter(isChallengeActive);
+  }, [data]);
+
+
 
   if (!firebaseConfigured) {
     return <SetupNotice />;
@@ -40,13 +107,17 @@ export default function Home() {
           <p className="eyebrow">Pixel Coding Adventure</p>
           <h1>Belajar coding, naik level, buka reward.</h1>
           <p>
-            Komunitas belajar coding yang didirikan oleh Letting 25 dengan tujuan membantu mahasiswa baru Pendidikan Teknologi Informasi memahami pemrograman dari nol hingga mampu membaca alur PHP dan MySQL secara bertahap.
+            Komunitas belajar coding yang didirikan oleh Letting 25 dengan tujuan membantu
+            mahasiswa baru Pendidikan Teknologi Informasi memahami pemrograman dari nol
+            hingga mampu membaca alur PHP dan MySQL secara bertahap.
           </p>
+
           <div className="hero-actions">
-            <Link className="pixel-button primary" to="/register">Mulai Petualangan</Link>
+            <Link className="pixel-button primary" to="/login">Mulai Petualangan</Link>
             <Link className="pixel-button secondary" to="/about">Lihat Komunitas</Link>
           </div>
         </div>
+
         <PixelCard className="hero-game-card">
           <div className="hero-character">👾</div>
           <h2>Stage 1</h2>
@@ -64,10 +135,62 @@ export default function Home() {
       </section>
 
       <section className="section-block">
+  <div className="section-heading">
+    <p className="eyebrow">Daily Quest</p>
+    <h2>Tantangan Aktif</h2>
+    <p>
+      Lihat tantangan terbaru yang bisa dikerjakan anggota untuk mendapatkan XP,
+      koin, badge, title, atau chest.
+    </p>
+
+    <Link className="pixel-button secondary" to="/challenges">
+      Buka Halaman Tantangan
+    </Link>
+  </div>
+
+  {activeChallenges.length ? (
+    <div className="challenge-home-grid">
+      {activeChallenges.slice(0, 3).map((challenge) => (
+        <PixelCard className="home-challenge-card" key={challenge.id}>
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">Challenge</p>
+              <h3>{challenge.title}</h3>
+            </div>
+
+            <span className={`challenge-reward-type ${challenge.rewardRarity || 'common'}`}>
+              {challenge.rewardType}
+            </span>
+          </div>
+
+          <p>{challenge.description}</p>
+
+          <div className="challenge-meta-list">
+            <span>🎁 {getRewardText(challenge)}</span>
+            <span>📅 {formatChallengeDate(challenge)}</span>
+            <span>{challenge.proofRequired ? '📌 Wajib bukti' : '✅ Tanpa bukti wajib'}</span>
+          </div>
+
+          <Link className="pixel-button primary" to="/challenges">
+            Lihat Tantangan
+          </Link>
+        </PixelCard>
+      ))}
+    </div>
+  ) : (
+    <PixelCard>
+      <h3>Belum ada tantangan aktif</h3>
+      <p>Tantangan akan muncul di sini setelah admin membuat dan mem-publish tantangan.</p>
+    </PixelCard>
+  )}
+</section>
+
+      <section className="section-block">
         <div className="section-heading">
           <p className="eyebrow">Party Member</p>
           <h2>Pengurus Inti</h2>
         </div>
+
         <div className="founder-grid">
           {data.founders.slice(0, 5).map((founder) => (
             <PixelCard className="founder-card" key={founder.id}>
@@ -84,6 +207,7 @@ export default function Home() {
         <PixelCard>
           <h2>Reward Terkunci</h2>
           <p>Naik stage untuk membuka title, badge, chest, frame profil, dan sertifikat akhir.</p>
+
           <div className="reward-preview-grid">
             <span>🔒 Golden Frame</span>
             <span>🔒 Backend Builder</span>
@@ -91,13 +215,16 @@ export default function Home() {
             <span>🔒 Victory Certificate</span>
           </div>
         </PixelCard>
+
         <PixelCard>
           <h2>Cara Main</h2>
+
           <ol className="clean-list numbered">
             <li>Daftar memakai nama asli dan NIM.</li>
             <li>Tunggu akun disetujui pengurus.</li>
             <li>Baca materi stage aktif.</li>
             <li>Selesaikan Quiz Battle untuk membuka stage berikutnya.</li>
+            <li>Ikut tantangan aktif untuk mendapatkan reward tambahan.</li>
           </ol>
         </PixelCard>
       </section>

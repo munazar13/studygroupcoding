@@ -23,6 +23,7 @@ import FinalQuest from './pages/FinalQuest';
 import Certificate from './pages/Certificate';
 import AdminLogin from './pages/AdminLogin';
 import AdminPanel from './pages/AdminPanel';
+import Challenges from './pages/Challenges';
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/admin-login" element={<AdminLogin />} />
               <Route path="/pending" element={<ProtectedRoute><PendingApproval /></ProtectedRoute>} />
+              <Route path="/challenges" element={ <ProtectedRoute requireApproved> <Challenges /> </ProtectedRoute> }/>
               <Route path="/dashboard" element={<ProtectedRoute requireApproved><Dashboard /></ProtectedRoute>} />
               <Route path="/map" element={<ProtectedRoute requireApproved><LearningMap /></ProtectedRoute>} />
               <Route path="/course/:stageId" element={<ProtectedRoute requireApproved><Course /></ProtectedRoute>} />
@@ -51,6 +53,7 @@ export default function App() {
               <Route path="/final-quest" element={<ProtectedRoute requireApproved><FinalQuest /></ProtectedRoute>} />
               <Route path="/certificate" element={<ProtectedRoute requireApproved><Certificate /></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute requireAdmin><AdminPanel /></ProtectedRoute>} />
+
             </Routes>
             <Footer />
           </div>

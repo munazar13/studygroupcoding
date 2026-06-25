@@ -70,58 +70,198 @@ export default function Quiz() {
   }
 
   async function finishQuiz() {
-    if (Object.keys(answers).length < questions.length) {
-      showToast('Jawab semua soal dulu.', 'error');
-      return;
-    }
-
-    if (computedResult.passed) {
-      await updateCurrentMember((member) => applyQuizPass(member, course, computedResult));
-      showToast('Stage Clear! Reward dan chest berhasil dibuka.');
-    } else {
-      await updateCurrentMember((member) => applyQuizAttempt(member, course, computedResult));
-      showToast('Belum lulus. Baca pembahasan lalu coba lagi.', 'error');
-    }
-
-    setResult(computedResult);
+  if (Object.keys(answers).length < questions.length) {
+    showToast('Jawab semua soal dulu.', 'error');
+    return;
   }
+
+  const stageNumber = Number(course.id || stageId);
+  const alreadyPassed = (currentMember.passedStages || []).includes(stageNumber);
+  const oldLevel = Number(currentMember.level || 1);
+
+  const chestStages = [5, 10, 15, 20, 25, 30, 32];
+  const hasChestReward =
+    course.hasChestReward === true ||
+    Boolean(course.chestId) ||
+    chestStages.includes(stageNumber);
+
+  let updatedMember = currentMember;
+
+  if (computedResult.passed) {
+    updatedMember = await updateCurrentMember((member) =>
+      applyQuizPass(member, course, computedResult)
+    );
+
+    showToast(
+      alreadyPassed
+        ? 'Quiz selesai. Nilai terbaik diperbarui jika lebih tinggi.'
+        : 'Stage Clear! Reward berhasil didapat.'
+    );
+  } else {
+    updatedMember = await updateCurrentMember((member) =>
+      applyQuizAttempt(member, course, computedResult)
+    );
+
+    showToast('Belum lulus. Baca pembahasan lalu coba lagi.', 'error');
+  }
+
+  setResult({
+    ...computedResult,
+    alreadyPassed,
+    rewardGiven: computedResult.passed && !alreadyPassed,
+    gainedXp: computedResult.passed && !alreadyPassed
+      ? Number(course.xpReward || 80) + (computedResult.score === 100 ? 50 : 0)
+      : 0,
+    gainedCoins: computedResult.passed && !alreadyPassed
+      ? Number(course.coinReward || 20)
+      : 0,
+    chestAvailable: computedResult.passed && !alreadyPassed && hasChestReward,
+    stageRewards: computedResult.passed && !alreadyPassed ? (updatedMember?.lastStageRewards || []) : [],
+    oldLevel,
+    newLevel: Number(updatedMember?.level || oldLevel),
+    xp: Number(updatedMember?.xp || 0),
+    xpToNextLevel: Number(updatedMember?.xpToNextLevel || 100),
+    nextStageId: stageNumber + 1
+  });
+}
 
   if (result) {
-    return (
-      <main className="page-shell quiz-page">
-        <PixelCard className="result-card">
-          <span className="big-icon">{result.passed ? '🎉' : '🧠'}</span>
-          <h1>{result.passed ? 'Stage Clear!' : 'Coba Lagi'}</h1>
-          <p>Benar {result.correct} dari {result.total} soal · Nilai {result.score}</p>
+  const xpPercent = result.xpToNextLevel
+    ? Math.min(100, Math.round((result.xp / result.xpToNextLevel) * 100))
+    : 0;
+
+  const isLastStage = Number(course.id || stageId) >= 32;
+
+  return (
+    <main className="page-shell quiz-page">
+      <PixelCard className="result-card stage-result-card">
+        <span className="big-icon">{result.passed ? '🎉' : '🧠'}</span>
+
+        <h1>{result.passed ? 'Stage Clear!' : 'Coba Lagi'}</h1>
+
+        <p>
+          Benar {result.correct} dari {result.total} soal · Nilai {result.score}
+        </p>
+
+        {result.passed ? (
+          <>
+            {result.rewardGiven ? (
+              <>
+                <div className="stage-reward-summary">
+                <div>
+                  <strong>+{result.gainedXp}</strong>
+                  <span>XP</span>
+                </div>
+
+                <div>
+                  <strong>+{result.gainedCoins}</strong>
+                  <span>Koin</span>
+                </div>
+
+                <div>
+                  <strong>{result.chestAvailable ? 'Ada' : 'Tidak ada'}</strong>
+                  <span>Chest</span>
+                </div>
+              </div>
+
+              {result.stageRewards?.length ? (
+                <ul className="clean-list reward-history-list">
+                  {result.stageRewards.map((reward) => (
+                    <li key={`${reward.type}-${reward.id}`}>
+                      <strong>{reward.icon || '🎁'} {reward.name}</strong>
+                      <span>{reward.type}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              </>
+            ) : (
+              <p>
+                Stage ini sudah pernah kamu selesaikan. Kamu boleh mengulang quiz
+                untuk memperbaiki nilai, tapi reward utama tidak diberikan lagi.
+              </p>
+            )}
+
+            {result.newLevel > result.oldLevel ? (
+              <div className="level-up-box">
+                <strong>LEVEL UP!</strong>
+                <span>Level {result.oldLevel} → Level {result.newLevel}</span>
+              </div>
+            ) : null}
+
+            <div className="level-progress-preview">
+              <div className="level-progress-head">
+                <span>Level {result.newLevel}</span>
+                <span>{result.xp}/{result.xpToNextLevel} XP</span>
+              </div>
+
+              <div className="pixel-progress large">
+                <span style={{ width: `${xpPercent}%` }} />
+              </div>
+            </div>
+
+            {result.chestAvailable ? (
+              <p>
+                Kamu mendapat chest baru. Chest belum dibuka otomatis, cek di menu Hadiah.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p>
+            Nilai minimal stage ini {course.minScore || 70}. Pelajari pembahasan
+            di bawah lalu coba lagi.
+          </p>
+        )}
+
+        <div className="result-actions">
+          <PixelButton
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              setResult(null);
+              setAnswers({});
+              setActiveIndex(0);
+            }}
+          >
+            🔁 Ulangi Stage
+          </PixelButton>
+
+          <PixelButton type="button" variant="secondary" onClick={() => navigate('/map')}>
+            🗺️ Kembali ke Map
+          </PixelButton>
+
+          {result.passed && !isLastStage ? (
+            <PixelButton type="button" onClick={() => navigate(`/course/${result.nextStageId}`)}>
+              ➡️ Stage Selanjutnya
+            </PixelButton>
+          ) : null}
+
           {result.passed ? (
-            <p>Stage berikutnya terbuka. Jangan lupa buka chest di Reward Collection.</p>
-          ) : (
-            <p>Nilai minimal stage ini {course.minScore || 70}. Pelajari pembahasan di bawah.</p>
-          )}
-          <div className="result-actions">
-            <Link className="pixel-button primary" to="/rewards">Reward Collection</Link>
-            <PixelButton variant="secondary" onClick={() => navigate('/map')}>Kembali ke Map</PixelButton>
-          </div>
-        </PixelCard>
+            <Link className="pixel-button primary" to="/rewards">
+              🎁 Cek Hadiah
+            </Link>
+          ) : null}
+        </div>
+      </PixelCard>
 
-        <section className="review-list">
-          {questions.map((question) => {
-            const userIndex = Number(answers[question.id]);
-            const correct = userIndex === Number(question.correctIndex);
+      <section className="review-list">
+        {questions.map((question) => {
+          const userIndex = Number(answers[question.id]);
+          const correct = userIndex === Number(question.correctIndex);
 
-            return (
-              <PixelCard className={correct ? 'review-card correct' : 'review-card wrong'} key={question.id}>
-                <h3>{question.question}</h3>
-                <p>Jawaban kamu: {question.options[userIndex] || 'Tidak dijawab'}</p>
-                <p>Jawaban benar: {question.options[question.correctIndex]}</p>
-                <small>{question.explanation}</small>
-              </PixelCard>
-            );
-          })}
-        </section>
-      </main>
-    );
-  }
+          return (
+            <PixelCard className={correct ? 'review-card correct' : 'review-card wrong'} key={question.id}>
+              <h3>{question.question}</h3>
+              <p>Jawaban kamu: {question.options[userIndex] || 'Tidak dijawab'}</p>
+              <p>Jawaban benar: {question.options[question.correctIndex]}</p>
+              <small>{question.explanation}</small>
+            </PixelCard>
+          );
+        })}
+      </section>
+    </main>
+  );
+}
 
   return (
     <main className="page-shell quiz-page">

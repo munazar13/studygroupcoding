@@ -493,4 +493,7 @@ font-size: 1.15rem;
 .bottom-more-menu {
 width: 225px;
 }
+.top-nav {
+  display: none !important;
+}
 }

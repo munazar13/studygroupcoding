@@ -47,8 +47,17 @@ export function getFirebaseDb() {
   return db;
 }
 
+export function normalizeNim(nim) {
+  return String(nim || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '');
+}
+
 export function nimToEmail(nim) {
-  return `${String(nim).trim()}@${firebaseAppOptions.nimEmailDomain}`;
+  const cleanNim = normalizeNim(nim);
+
+  return `${cleanNim}@${firebaseAppOptions.nimEmailDomain}`;
 }
 
 export function adminIdentifierToEmail(identifier) {
@@ -81,48 +90,138 @@ export async function signInAdmin(identifier, password) {
   return signInWithEmailAndPassword(auth, adminIdentifierToEmail(identifier), password);
 }
 
+function createDefaultMember(payload, uid) {
+  const now = new Date().toISOString();
+
+  return {
+    uid,
+    name: String(payload.name || '').trim(),
+    nim: normalizeNim(payload.nim),
+    cohort: String(payload.cohort || '').trim(),
+    avatar: payload.avatar || '🧑‍💻',
+
+    role: 'member',
+    status: 'pending',
+
+    level: 1,
+    xp: 0,
+    xpToNextLevel: 100,
+    totalXp: 0,
+    coins: 0,
+    streak: 0,
+
+    currentStage: 1,
+    completedCourses: [],
+    completedStages: [],
+    passedStages: [],
+    stageProgress: {},
+
+    badges: [],
+    titles: [],
+    frames: [],
+    avatars: [],
+
+    ownedBadges: [],
+    ownedTitles: [],
+    ownedFrames: [],
+    ownedAvatars: [],
+
+    activeBadge: '',
+    activeTitle: '',
+    activeFrame: '',
+    activeAvatar: '',
+
+    unlockedRewards: [],
+    unopenedChests: [],
+    openedChests: [],
+    chestHistory: [],
+    coinTransactions: [],
+    quizHistory: [],
+    activityLogs: [],
+
+    challengeSubmissions: [],
+    completedChallenges: [],
+    challengeRewardHistory: [],
+    lastChallengeReward: null,
+
+    finalQuestComplete: false,
+    certificateCode: '',
+    lastStudyDate: '',
+
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
 export async function createMemberAccount(payload) {
   if (!firebaseReady()) {
     throw new Error('Firebase belum dikonfigurasi.');
   }
 
-  const credential = await createUserWithEmailAndPassword(auth, nimToEmail(payload.nim), payload.password);
-  const now = new Date().toISOString();
+  const authEmail = nimToEmail(payload.nim);
 
-  await updateProfile(credential.user, {
-    displayName: payload.name
-  });
+  try {
+    const credential = await createUserWithEmailAndPassword(
+      auth,
+      authEmail,
+      payload.password
+    );
 
-  const member = {
-    uid: credential.user.uid,
-    name: payload.name.trim(),
-    nim: payload.nim.trim(),
-    cohort: payload.cohort.trim(),
-    avatar: payload.avatar || '🧑‍💻',
-    role: 'member',
-    status: 'pending',
-    xp: 0,
-    coins: 0,
-    streak: 0,
-    currentStage: 1,
-    completedCourses: [],
-    passedStages: [],
-    badges: [],
-    unlockedRewards: [],
-    unopenedChests: [],
-    chestHistory: [],
-    quizHistory: [],
-    finalQuestComplete: false,
-    certificateCode: '',
-    lastStudyDate: '',
-    createdAt: now,
-    updatedAt: now
-  };
+    await updateProfile(credential.user, {
+      displayName: payload.name
+    });
 
-  await setDoc(doc(db, 'members', credential.user.uid), member);
-  await createActivity(`${member.name} mendaftar dan menunggu persetujuan pengurus.`, 'member');
+    const member = createDefaultMember(payload, credential.user.uid);
 
-  return member;
+    await setDoc(doc(db, 'members', credential.user.uid), member);
+
+    await createActivity(
+      `${member.name} mendaftar dan menunggu persetujuan pengurus.`,
+      'member'
+    );
+
+    return member;
+  } catch (error) {
+    if (error.code !== 'auth/email-already-in-use') {
+      throw error;
+    }
+
+    const credential = await signInWithEmailAndPassword(
+      auth,
+      authEmail,
+      payload.password
+    );
+
+    const existingMember = await getMember(credential.user.uid);
+
+    if (existingMember) {
+      throw new Error('NIM ini sudah terdaftar. Silakan login, bukan daftar ulang.');
+    }
+
+    await updateProfile(credential.user, {
+      displayName: payload.name
+    });
+
+    const member = createDefaultMember(payload, credential.user.uid);
+
+    await setDoc(doc(db, 'members', credential.user.uid), member);
+
+    await createActivity(
+      `${member.name} m ulang.');
+    }
+
+    await updateProfile(credential.user, {
+      displayName: payload.name
+    });
+
+    const member = createDefaultMember(payload, credential.user.uid);
+
+    await setendaftar ulang dan menunggu persetujuan pengurus.`,
+      'member'
+    );
+
+    return member;
+  }
 }
 
 export function listenToAuth(callback) {
@@ -236,7 +335,9 @@ export async function seedCoreData(seed) {
     ['founders', seed.founders || []],
     ['events', seed.events || []],
     ['docs', seed.docs || []],
-    ['projects', seed.projects || []]
+    ['projects', seed.projects || []],
+    ['challenges', seed.challenges || []],
+    ['challengeSubmissions', seed.challengeSubmissions || []]
   ];
 
   collections.forEach(([name, items]) => {

@@ -16,7 +16,8 @@ const memberLinks = [
 { to: '/map', label: 'Map', icon: '🗺️' },
 { to: '/rewards', label: 'Reward', icon: '🎁' },
 { to: '/leaderboard', label: 'Rank', icon: '🏆' },
-{ to: '/profile', label: 'Profil', icon: '🧙' }
+{ to: '/profile', label: 'Profil', icon: '🧙' },
+{ to: '/challenges', label: 'Tantangan', icon: '⚔️' }
 ];
 
 const adminLinks = [

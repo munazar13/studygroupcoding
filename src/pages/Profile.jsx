@@ -1,41 +1,216 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import LoadingState from '../components/LoadingState';
+import PixelButton from '../components/PixelButton';
 import PixelCard from '../components/PixelCard';
 import StatCard from '../components/StatCard';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { loadLearningData } from '../services/dataApi';
-import { calculateAverageQuiz, getRank } from '../utils/levelSystem';
+import { calculateAverageQuiz, getRank, getXpPercent } from '../utils/levelSystem';
+import { getRarityClassName, getRarityLabel } from '../utils/rarity';
+
+function getChallengeStatusText(status) {
+  if (status === 'approved') return 'Reward Diterima';
+  if (status === 'rejected') return 'Ditolak';
+  if (status === 'pending') return 'Menunggu Review';
+
+  return 'Belum Dikirim';
+}
+
+function getChallengeStatusClass(status) {
+  if (status === 'approved') return 'approved';
+  if (status === 'rejected') return 'rejected';
+  if (status === 'pending') return 'pending';
+
+  return 'not-submitted';
+}
+
+function formatProfileDate(date) {
+  if (!date) return '-';
+
+  return new Date(date).toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+}
+function getRewardName(reward) {
+  return reward?.title || reward?.name || reward?.id || 'Reward';
+}
+
+function getRewardType(reward) {
+  return String(reward?.type || reward?.category || '').toLowerCase();
+}
+
+function createFallbackReward(id, type = 'badge') {
+  const cleanId = String(id || '').trim();
+
+  if (!cleanId) return null;
+
+  const cleanName = cleanId.replace(/[-_]+/g, ' ');
+
+  return {
+    id: cleanId,
+    name: cleanName,
+    title: cleanName,
+    type,
+    category: type,
+    rarity: 'common',
+    description: type === 'title'
+      ? 'Title yang sudah kamu miliki.'
+      : 'Badge yang sudah kamu miliki.'
+  };
+}
+
+function findRewardById(rewards = [], id, type = 'badge') {
+  const cleanId = String(id || '').trim();
+
+  if (!cleanId) return null;
+
+  return (
+    rewards.find((item) => String(item?.id || '').trim() === cleanId) ||
+    createFallbackReward(cleanId, type)
+  );
+}
 
 export default function Profile() {
-  const { currentMember } = useAuth();
+  const { currentMember, updateCurrentMember } = useAuth();
+  const { showToast } = useToast();
+
+  const [rewards, setRewards] = useState([]);
   const [ranks, setRanks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadLearningData()
-      .then((data) => setRanks(data.ranks))
+      .then((data) => {
+        setRanks(data.ranks || []);
+        setRewards(data.rewards || []);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  const ownedBadgeIds = useMemo(() => {
+  return Array.from(new Set([
+    ...(currentMember?.badges || []),
+    ...(currentMember?.ownedBadges || [])
+  ]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+  ));
+}, [currentMember]);
+
+const ownedTitleIds = useMemo(() => {
+  return Array.from(new Set([
+    ...(currentMember?.titles || []),
+    ...(currentMember?.ownedTitles || [])
+  ]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean)
+  ));
+}, [currentMember]);
+
+const badgeRewards = useMemo(() => {
+  return ownedBadgeIds
+    .map((badgeId) => findRewardById(rewards, badgeId, 'badge'))
+    .filter(Boolean);
+}, [ownedBadgeIds, rewards]);
+
+const titleRewards = useMemo(() => {
+  return ownedTitleIds
+    .map((titleId) => findRewardById(rewards, titleId, 'title'))
+    .filter(Boolean);
+}, [ownedTitleIds, rewards]);
+
+const activeBadge = findRewardById(rewards, currentMember?.activeBadge, 'badge');
+const activeTitle = findRewardById(rewards, currentMember?.activeTitle, 'title');
 
   if (loading) {
     return <LoadingState />;
   }
 
-  const rank = getRank(ranks, currentMember.xp);
+  const level = Number(currentMember.level || 1);
+  const xp = Number(currentMember.xp || 0);
+  const xpToNextLevel = Number(currentMember.xpToNextLevel || 100);
+  const xpPercent = getXpPercent(currentMember);
+  const rank = getRank(ranks, currentMember.totalXp || currentMember.xp || 0);
 
+  async function setActiveBadge(badgeId) {
+    if (!ownedBadgeIds.includes(String(badgeId))) {
+      showToast('Badge ini belum kamu miliki.', 'error');
+      return;
+    }
+
+    try {
+      await updateCurrentMember({ activeBadge: badgeId });
+      showToast('Badge aktif berhasil diganti.');
+    } catch (error) {
+      showToast(error.message || 'Gagal memasang badge.', 'error');
+    }
+  }
+
+  async function setActiveTitle(titleId) {
+    if (!ownedTitleIds.includes(String(titleId))) {
+      showToast('Title ini belum kamu miliki.', 'error');
+      return;
+    }
+
+    try {
+      await updateCurrentMember({ activeTitle: titleId });
+      showToast('Title aktif berhasil diganti.');
+    } catch (error) {
+      showToast(error.message || 'Gagal memasang title.', 'error');
+    }
+  }
+
+  const challengeSubmissions = [...(currentMember?.challengeSubmissions || [])].sort((a, b) => {
+  return new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0);
+});
+
+  const pendingChallengeCount = challengeSubmissions.filter(
+  (submission) => submission.status === 'pending'
+).length;
+
+const latestChallengeReview = challengeSubmissions.find(
+  (submission) => submission.status === 'approved' || submission.status === 'rejected'
+);
   return (
     <main className="page-shell">
       <section className="profile-header">
         <div className="profile-avatar">{currentMember.avatar}</div>
+
         <div>
           <p className="eyebrow">Profil Anggota</p>
           <h1>{currentMember.name}</h1>
-          <p>{rank.name} · {currentMember.cohort}</p>
+
+          <p>
+            {activeTitle ? getRewardName(activeTitle) : rank.name} · {currentMember.cohort}
+          </p>
+
+          <div className="profile-active-rewards">
+            <span className={`profile-reward-pill ${activeTitle ? getRarityClassName(activeTitle.rarity) : 'rarity-common'}`}>
+              🎖️ {activeTitle ? getRewardName(activeTitle) : 'Belum ada title aktif'}
+            </span>
+
+            <span className={`profile-reward-pill ${activeBadge ? getRarityClassName(activeBadge.rarity) : 'rarity-common'}`}>
+              🏅 {activeBadge ? getRewardName(activeBadge) : 'Belum ada badge aktif'}
+            </span>
+          </div>
+        </div>
+      </section>
+
+      <section className="profile-level-card pixel-card">
+        <div className="level-progress-head">
+          <strong>Level {level}</strong>
+          <span>{xp}/{xpToNextLevel} XP menuju Level {level + 1}</span>
+        </div>
+
+        <div className="pixel-progress large">
+          <span style={{ width: `${xpPercent}%` }} />
         </div>
       </section>
 
       <section className="stat-grid">
-        <StatCard icon="⭐" value={currentMember.xp || 0} label="XP" />
+        <StatCard icon="⭐" value={currentMember.totalXp || currentMember.xp || 0} label="Total XP" />
         <StatCard icon="🪙" value={currentMember.coins || 0} label="Koin" />
         <StatCard icon="🔥" value={currentMember.streak || 0} label="Streak" />
         <StatCard icon="🧠" value={calculateAverageQuiz(currentMember)} label="Rata-rata Quiz" />
@@ -43,22 +218,185 @@ export default function Profile() {
 
       <section className="two-column">
         <PixelCard>
-          <h2>Progress</h2>
-          <p>Stage selesai: {currentMember.passedStages?.length || 0}/32</p>
+          <h2>Progress Belajar</h2>
+          <p>Stage selesai: {currentMember.completedStages?.length || currentMember.passedStages?.length || 0}/32</p>
           <p>Stage aktif: {currentMember.currentStage || 1}</p>
           <p>NIM: {currentMember.nim}</p>
+          <p>Chest belum dibuka: {currentMember.unopenedChests?.length || 0}</p>
         </PixelCard>
+
         <PixelCard>
-          <h2>Badge</h2>
-          {(currentMember.badges || []).length ? (
-            <div className="badge-list">
-              {currentMember.badges.map((badge) => <span key={badge}>🏅 {badge}</span>)}
-            </div>
-          ) : (
-            <p>Badge akan muncul setelah kamu menyelesaikan Quiz Battle.</p>
-          )}
+          <h2>Identitas Aktif</h2>
+          <p>Title aktif: {activeTitle ? getRewardName(activeTitle) : 'Belum dipilih'}</p>
+          <p>Badge aktif: {activeBadge ? getRewardName(activeBadge) : 'Belum dipilih'}</p>
+          <p>Title dan badge aktif akan tampil di leaderboard.</p>
         </PixelCard>
       </section>
+
+      <section className="section-block">
+        <div className="section-heading">
+          <h2>Pilih Badge Aktif</h2>
+          <p>Badge aktif akan muncul di profil dan leaderboard.</p>
+        </div>
+
+        <div className="reward-grid">
+          {badgeRewards.length ? badgeRewards.map((badge) => {
+            const isActive = String(currentMember.activeBadge || '') === String(badge.id || '');
+
+            return (
+              <PixelCard
+                className={`reward-card open ${getRarityClassName(badge.rarity)} ${isActive ? 'active-reward' : ''}`}
+                key={badge.id}
+              >
+                <span className="reward-icon">🏅</span>
+                <h3>{getRewardName(badge)}</h3>
+                <p>{badge.description || 'Badge yang sudah kamu miliki.'}</p>
+                <small>{getRarityLabel(badge.rarity)} · {isActive ? 'Sedang dipakai' : 'Belum dipakai'}</small>
+
+                <PixelButton
+                  type="button"
+                  variant={isActive ? 'secondary' : 'primary'}
+                  onClick={() => setActiveBadge(badge.id)}
+                  disabled={isActive}
+                >
+                  {isActive ? 'Dipakai' : 'Pakai Badge'}
+                </PixelButton>
+              </PixelCard>
+            );
+          }) : (
+            <PixelCard>
+              <h3>Belum ada badge</h3>
+              <p>Badge akan muncul setelah kamu menyelesaikan stage, membuka chest, atau menyelesaikan tantangan.</p>
+            </PixelCard>
+          )}
+        </div>
+      </section>
+
+      <section className="section-block">
+        <div className="section-heading">
+          <h2>Pilih Title Aktif</h2>
+          <p>Title aktif akan tampil di bawah namamu.</p>
+        </div>
+
+        <div className="reward-grid">
+          {titleRewards.length ? titleRewards.map((title) => {
+            const isActive = String(currentMember.activeTitle || '') === String(title.id || '');
+
+            return (
+              <PixelCard
+                className={`reward-card open ${getRarityClassName(title.rarity)} ${isActive ? 'active-reward' : ''}`}
+                key={title.id}
+              >
+                <span className="reward-icon">🎖️</span>
+                <h3>{getRewardName(title)}</h3>
+                <p>{title.description || 'Title yang sudah kamu miliki.'}</p>
+                <small>{getRarityLabel(title.rarity)} · {isActive ? 'Sedang dipakai' : 'Belum dipakai'}</small>
+
+                <PixelButton
+                  type="button"
+                  variant={isActive ? 'secondary' : 'primary'}
+                  onClick={() => setActiveTitle(title.id)}
+                  disabled={isActive}
+                >
+                  {isActive ? 'Dipakai' : 'Pakai Title'}
+                </PixelButton>
+              </PixelCard>
+            );
+          }) : (
+            <PixelCard>
+              <h3>Belum ada title</h3>
+              <p>Title bisa didapat dari chest, shop, atau tantangan khusus.</p>
+            </PixelCard>
+          )}
+        </div>
+      </section>
+          {pendingChallengeCount || latestChallengeReview ? (
+  <section className="profile-challenge-alerts">
+    {pendingChallengeCount ? (
+      <PixelCard className="profile-alert-card pending">
+        <div>
+          <p className="eyebrow">Menunggu Review</p>
+          <h3>{pendingChallengeCount} Tantangan Pending</h3>
+          <p>Bukti tantangan kamu sudah dikirim dan sedang menunggu admin approve.</p>
+        </div>
+
+        <span className="challenge-status-pill pending">
+          Pending
+        </span>
+      </PixelCard>
+    ) : null}
+
+    {latestChallengeReview ? (
+      <PixelCard className={`profile-alert-card ${latestChallengeReview.status}`}>
+        <div>
+          <p className="eyebrow">Update Tantangan</p>
+          <h3>{latestChallengeReview.challengeTitle || 'Tantangan'}</h3>
+          <p>
+            Status terbaru: <strong>{getChallengeStatusText(latestChallengeReview.status)}</strong>
+          </p>
+        </div>
+
+        <span className={`challenge-status-pill ${getChallengeStatusClass(latestChallengeReview.status)}`}>
+          {getChallengeStatusText(latestChallengeReview.status)}
+        </span>
+      </PixelCard>
+    ) : null}
+  </section>
+) : null}
+      <section className="section-block">
+  <div className="section-heading">
+    <p className="eyebrow">Challenge History</p>
+    <h2>Riwayat Tantangan</h2>
+    <p>Status tantangan yang pernah kamu kirim untuk direview admin.</p>
+  </div>
+
+  {challengeSubmissions.length ? (
+    <div className="profile-challenge-list">
+      {challengeSubmissions.map((submission) => (
+        <PixelCard className="profile-challenge-card" key={submission.id}>
+          <div className="section-title-row">
+            <div>
+              <h3>{submission.challengeTitle || 'Tantangan'}</h3>
+              <p>Dikirim: {formatProfileDate(submission.submittedAt)}</p>
+            </div>
+
+            <span className={`challenge-status-pill ${getChallengeStatusClass(submission.status)}`}>
+              {getChallengeStatusText(submission.status)}
+            </span>
+          </div>
+
+          {submission.proofText ? (
+            <p>
+              <strong>Bukti:</strong> {submission.proofText}
+            </p>
+          ) : null}
+
+          {submission.proofUrl ? (
+            <a
+              className="text-link"
+              href={submission.proofUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Buka link bukti
+            </a>
+          ) : null}
+
+          {submission.reviewedAt ? (
+            <p>
+              <strong>Direview:</strong> {formatProfileDate(submission.reviewedAt)}
+            </p>
+          ) : null}
+        </PixelCard>
+      ))}
+    </div>
+  ) : (
+    <PixelCard>
+      <h3>Belum ada riwayat tantangan</h3>
+      <p>Kirim bukti tantangan dari halaman Tantangan untuk melihat riwayatnya di sini.</p>
+    </PixelCard>
+  )}
+</section>
     </main>
   );
 }

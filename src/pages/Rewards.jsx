@@ -6,93 +6,251 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { loadLearningData } from '../services/dataApi';
 import { openChest } from '../utils/progress';
+import { getRarityClassName, getRarityLabel } from '../utils/rarity';
+
+
+function getRewardType(reward) {
+  return String(reward?.type || reward?.category || '').toLowerCase();
+}
+
+function createFallbackReward(id, type = 'badge') {
+  return {
+    id,
+    type,
+    category: type,
+    title: String(id).replace(/[-_]+/g, ' '),
+    name: String(id).replace(/[-_]+/g, ' '),
+    rarity: 'common',
+    description: type === 'title' ? 'Title yang sudah kamu miliki.' : 'Badge yang sudah kamu miliki.'
+  };
+}
+
+function mergeRewardItems(rewards = [], ownedIds = new Set(), type = 'badge') {
+  const map = new Map();
+
+  rewards
+    .filter((reward) => getRewardType(reward).includes(type))
+    .forEach((reward) => map.set(String(reward.id), reward));
+
+  ownedIds.forEach((id) => {
+    if (!map.has(String(id))) {
+      map.set(String(id), createFallbackReward(id, type));
+    }
+  });
+
+  return Array.from(map.values());
+}
 
 export default function Rewards() {
   const { currentMember, updateCurrentMember } = useAuth();
   const { showToast } = useToast();
+
   const [rewards, setRewards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [openingChestId, setOpeningChestId] = useState('');
+  const [lastReward, setLastReward] = useState(null);
 
   useEffect(() => {
     loadLearningData()
-      .then((data) => setRewards(data.rewards))
+      .then((data) => setRewards(data.rewards || []))
       .finally(() => setLoading(false));
   }, []);
 
-  const unlocked = useMemo(() => new Set([...(currentMember.badges || []), ...(currentMember.unlockedRewards || [])]), [currentMember]);
+  const unopenedChests = currentMember?.unopenedChests || [];
+  const chestHistory = currentMember?.chestHistory || [];
+
+  const ownedBadges = useMemo(() => {
+    return new Set([
+      ...(currentMember?.badges || []),
+      ...(currentMember?.ownedBadges || [])
+    ].map((item) => String(item)));
+  }, [currentMember]);
+
+  const ownedTitles = useMemo(() => {
+    return new Set([
+      ...(currentMember?.titles || []),
+      ...(currentMember?.ownedTitles || [])
+    ].map((item) => String(item)));
+  }, [currentMember]);
+
+  const badgeRewards = useMemo(() => mergeRewardItems(rewards, ownedBadges, 'badge'), [rewards, ownedBadges]);
+  const titleRewards = useMemo(() => mergeRewardItems(rewards, ownedTitles, 'title'), [rewards, ownedTitles]);
 
   if (loading) {
     return <LoadingState />;
   }
 
   async function handleOpenChest(chestId) {
-    const patch = openChest(currentMember, chestId);
+    setOpeningChestId(chestId);
 
-    if (!patch) {
-      showToast('Chest tidak ditemukan.', 'error');
-      return;
+    try {
+      const patch = openChest(currentMember, chestId);
+
+      if (!patch) {
+        showToast('Chest tidak ditemukan.', 'error');
+        return;
+      }
+
+      await updateCurrentMember(patch);
+
+      const newestReward = patch.chestHistory?.[0] || null;
+      setLastReward(newestReward);
+
+      showToast(newestReward?.rewardText || 'Chest berhasil dibuka.');
+    } catch (error) {
+      showToast(error.message || 'Gagal membuka chest.', 'error');
+    } finally {
+      setOpeningChestId('');
     }
-
-    await updateCurrentMember(patch);
-    showToast('Chest terbuka. XP dan koin masuk ke profil.');
   }
 
   return (
-    <main className="page-shell">
+    <main className="page-shell rewards-page">
       <section className="page-hero compact-hero">
-        <p className="eyebrow">Reward Collection</p>
-        <h1>Chest, Badge, dan Title</h1>
-        <p>Kumpulkan reward dari course, quiz, dan streak belajar.</p>
+        <p className="eyebrow">Menu Hadiah</p>
+        <h1>Hadiah & Chest</h1>
+        <p>
+          Chest yang kamu dapat dari stage akan masuk ke sini. Buka chest untuk
+          mendapatkan XP, koin, badge, atau title.
+        </p>
       </section>
+
+      {lastReward ? (
+        <PixelCard className="reward-reveal-card">
+          <span className="big-icon">✨</span>
+          <div>
+            <p className="eyebrow">Hadiah Terbaru</p>
+            <h2>{lastReward.rewardText}</h2>
+            <p>{lastReward.title} · {lastReward.rarity || 'Chest'}</p>
+          </div>
+        </PixelCard>
+      ) : null}
 
       <section className="two-column">
         <PixelCard>
-          <h2>Chest Belum Dibuka</h2>
-          {(currentMember.unopenedChests || []).length ? (
+          <div className="section-title-row">
+            <h2>Chest Belum Dibuka</h2>
+            <span>{unopenedChests.length} chest</span>
+          </div>
+
+          {unopenedChests.length ? (
             <div className="chest-list">
-              {currentMember.unopenedChests.map((chest) => (
-                <div className="chest-item" key={chest.id}>
-                  <span>🎁</span>
+              {unopenedChests.map((chest) => (
+                <div className="chest-item reward-chest-card" key={chest.id}>
+                  <span className="chest-icon">🎁</span>
+
                   <div>
-                    <strong>{chest.title}</strong>
-                    <p>{chest.rarity} · +{chest.xp} XP · +{chest.coins} koin</p>
+                    <strong>{chest.title || 'Chest Baru'}</strong>
+                    <p>
+                      {chest.rarity || 'Common'} · dari {chest.sourceStageTitle || `Stage ${chest.stageId || '-'}`}
+                    </p>
+                    <small>Belum dibuka</small>
                   </div>
-                  <PixelButton onClick={() => handleOpenChest(chest.id)}>Buka</PixelButton>
+
+                  <PixelButton
+                    type="button"
+                    disabled={openingChestId === chest.id}
+                    onClick={() => handleOpenChest(chest.id)}
+                  >
+                    {openingChestId === chest.id ? 'Membuka...' : 'Buka'}
+                  </PixelButton>
                 </div>
               ))}
             </div>
           ) : (
-            <p>Belum ada chest. Selesaikan Quiz Battle untuk mendapat peti baru.</p>
+            <div className="empty-reward-box">
+              <span>📦</span>
+              <h3>Belum ada chest</h3>
+              <p>
+                Selesaikan stage tertentu untuk mendapatkan chest. Chest tidak
+                terbuka otomatis, jadi nanti akan muncul di sini.
+              </p>
+            </div>
           )}
         </PixelCard>
 
         <PixelCard>
-          <h2>Riwayat Chest</h2>
-          {(currentMember.chestHistory || []).length ? (
-            <ul className="clean-list">
-              {currentMember.chestHistory.slice(0, 8).map((chest) => (
-                <li key={chest.id}>{chest.title} · {chest.rewardText}</li>
+          <div className="section-title-row">
+            <h2>Riwayat Chest</h2>
+            <span>{chestHistory.length} dibuka</span>
+          </div>
+
+          {chestHistory.length ? (
+            <ul className="clean-list reward-history-list">
+              {chestHistory.slice(0, 10).map((chest) => (
+                <li key={`${chest.id}-${chest.openedAt || chest.createdAt}`}>
+                  <strong>{chest.title}</strong>
+                  <span>{chest.rewardText}</span>
+                </li>
               ))}
             </ul>
           ) : (
-            <p>Chest yang sudah dibuka akan muncul di sini.</p>
+            <div className="empty-reward-box">
+              <span>🕹️</span>
+              <h3>Belum ada riwayat</h3>
+              <p>Chest yang sudah dibuka akan muncul di sini.</p>
+            </div>
           )}
         </PixelCard>
       </section>
 
-      <section className="reward-grid">
-        {rewards.map((reward) => {
-          const isUnlocked = unlocked.has(reward.id);
+      <section className="section-block">
+        <div className="section-heading">
+          <h2>Badge yang Dimiliki</h2>
+          <p>Badge aktif nanti bisa ditampilkan di profil dan leaderboard.</p>
+        </div>
 
-          return (
-            <PixelCard className={isUnlocked ? 'reward-card open' : 'reward-card locked'} key={reward.id}>
-              <span className="reward-icon">{isUnlocked ? '🏅' : '🔒'}</span>
-              <h3>{reward.title || reward.name}</h3>
-              <p>{reward.description || reward.unlockText || 'Buka dengan menyelesaikan stage tertentu.'}</p>
-              <small>{isUnlocked ? 'Sudah terbuka' : reward.requirement || 'Masih terkunci'}</small>
+        <div className="reward-grid">
+          {badgeRewards.length ? badgeRewards.map((reward) => {
+            const isOwned = ownedBadges.has(reward.id);
+
+            return (
+              <PixelCard
+  className={`reward-card ${isOwned ? 'open' : 'locked'} ${getRarityClassName(reward.rarity)}`}
+  key={reward.id}
+>
+                <span className="reward-icon">{isOwned ? '🏅' : '🔒'}</span>
+                <h3>{reward.title || reward.name}</h3>
+                <p>{reward.description || reward.unlockText || 'Badge reward.'}</p>
+                <small>
+  {getRarityLabel(reward.rarity)} · {isOwned ? 'Sudah dimiliki' : reward.requirement || 'Belum dimiliki'}
+</small>
+              </PixelCard>
+            );
+          }) : (
+            <PixelCard>
+              <h3>Belum ada data badge</h3>
+              <p>Badge akan muncul setelah data reward ditambahkan.</p>
             </PixelCard>
-          );
-        })}
+          )}
+        </div>
+      </section>
+
+      <section className="section-block">
+        <div className="section-heading">
+          <h2>Title yang Dimiliki</h2>
+          <p>Title bisa dipakai untuk mempercantik nama di leaderboard.</p>
+        </div>
+
+        <div className="reward-grid">
+          {titleRewards.length ? titleRewards.map((reward) => {
+            const isOwned = ownedTitles.has(reward.id);
+
+            return (
+              <PixelCard className={`reward-card ${isOwned ? 'open' : 'locked'} ${getRarityClassName(reward.rarity)}`} key={reward.id}>
+                <span className="reward-icon">{isOwned ? '🎖️' : '🔒'}</span>
+                <h3>{reward.title || reward.name}</h3>
+                <p>{reward.description || reward.unlockText || 'Title reward.'}</p>
+                <small>{getRarityLabel(reward.rarity)} · {isOwned ? 'Sudah dimiliki' : reward.requirement || 'Belum dimiliki'}</small>
+              </PixelCard>
+            );
+          }) : (
+            <PixelCard>
+              <h3>Belum ada data title</h3>
+              <p>Title akan muncul setelah data reward ditambahkan.</p>
+            </PixelCard>
+          )}
+        </div>
       </section>
     </main>
   );

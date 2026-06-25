@@ -7,7 +7,7 @@ import StatCard from '../components/StatCard';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { loadLearningData } from '../services/dataApi';
-import { applyCourseCompletion } from '../utils/progress';
+import { updateStudyStreak } from '../utils/progress';
 import { getNextCourse, getRank } from '../utils/levelSystem';
 
 export default function Dashboard() {
@@ -38,9 +38,8 @@ export default function Dashboard() {
       return;
     }
 
-    const updated = applyCourseCompletion(currentMember, targetCourse);
-    await updateCurrentMember(updated);
-    showToast('Misi harian dicatat. Streak dan XP diperbarui.');
+    await updateCurrentMember(updateStudyStreak(currentMember));
+    showToast('Misi harian dicatat. Streak diperbarui. Quiz tetap harus dibuka dari materi stage.');
   }
 
   return (

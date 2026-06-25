@@ -5,6 +5,7 @@ import PixelCard from '../components/PixelCard';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import finalQuest from '../data/finalQuest.json';
+import { addCoinsToMember, addXpToMember } from '../utils/levelSystem';
 
 export default function FinalQuest() {
   const { currentMember, updateCurrentMember } = useAuth();
@@ -19,13 +20,23 @@ export default function FinalQuest() {
     const passed = score >= 80;
 
     if (passed) {
-      await updateCurrentMember({
-        finalQuestComplete: true,
-        certificateCode: `SGC-${currentMember.nim}-${Date.now().toString().slice(-6)}`,
-        xp: Number(currentMember.xp || 0) + 500,
-        coins: Number(currentMember.coins || 0) + 200
-      });
-      showToast('Final Quest selesai. Sertifikat terbuka.');
+      if (currentMember.finalQuestComplete) {
+        showToast('Final Quest sudah pernah selesai. Sertifikat tetap terbuka, reward tidak diberikan ulang.');
+      } else {
+        let nextMember = addXpToMember(currentMember, 500);
+        nextMember = addCoinsToMember(nextMember, 200);
+
+        await updateCurrentMember({
+          level: nextMember.level,
+          xp: nextMember.xp,
+          xpToNextLevel: nextMember.xpToNextLevel,
+          totalXp: nextMember.totalXp,
+          coins: nextMember.coins,
+          finalQuestComplete: true,
+          certificateCode: `SGC-${currentMember.nim}-${Date.now().toString().slice(-6)}`
+        });
+        showToast('Final Quest selesai. Sertifikat terbuka.');
+      }
     } else {
       showToast('Nilai belum cukup. Pelajari ulang stage PHP dan MySQL.', 'error');
     }

@@ -9,15 +9,35 @@ import { loadCourse, loadQuestions } from '../services/dataApi';
 import { applyCourseCompletion } from '../utils/progress';
 
 function renderContent(content) {
-  if (Array.isArray(content)) {
-    return content.map((paragraph) => <p key={paragraph}>{paragraph}</p>);
-  }
+  const rawContent = Array.isArray(content)
+    ? content.join('\n\n')
+    : String(content || '');
 
-  return String(content || '')
-    .split('\n')
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-    .map((paragraph) => <p key={paragraph}>{paragraph}</p>);
+  const parts = rawContent.split(/```/g);
+
+  return parts.map((part, index) => {
+    const isCodeBlock = index % 2 === 1;
+
+    if (isCodeBlock) {
+      const lines = part.replace(/^\n/, '').split('\n');
+      const language = lines[0]?.trim();
+      const code = lines.slice(1).join('\n').trimEnd();
+
+      return (
+        <pre className={`lesson-code-block language-${language || 'text'}`} key={`code-${index}`}>
+          <code>{code}</code>
+        </pre>
+      );
+    }
+
+    return part
+      .split(/\n{2,}/g)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean)
+      .map((paragraph, paragraphIndex) => (
+        <p key={`paragraph-${index}-${paragraphIndex}`}>{paragraph}</p>
+      ));
+  });
 }
 
 export default function Course() {
@@ -98,7 +118,9 @@ export default function Course() {
               {(course.modules || []).map((module) => (
                 <PixelCard className="material-card" key={module.id}>
                   <h2>{module.title}</h2>
+                  <div className="lesson-content">
                   {renderContent(module.content)}
+                  </div>
                   {module.code ? <pre><code>{module.code}</code></pre> : null}
                   {module.checkpoint ? <div className="checkpoint">🎯 {module.checkpoint}</div> : null}
                 </PixelCard>
