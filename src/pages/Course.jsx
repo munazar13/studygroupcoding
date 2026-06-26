@@ -34,9 +34,27 @@ function renderContent(content) {
       .split(/\n{2,}/g)
       .map((paragraph) => paragraph.trim())
       .filter(Boolean)
-      .map((paragraph, paragraphIndex) => (
-        <p key={`paragraph-${index}-${paragraphIndex}`}>{paragraph}</p>
-      ));
+      .map((paragraph, paragraphIndex) => {
+        const imageMatch = paragraph.match(/^!\[(.*?)\]\((.*?)\)$/);
+
+        if (imageMatch) {
+          const altText = imageMatch[1] || 'Gambar materi';
+          const imageUrl = imageMatch[2];
+
+          return (
+            <figure className="lesson-image-block" key={`image-${index}-${paragraphIndex}`}>
+              <img src={imageUrl} alt={altText} />
+              <figcaption>{altText}</figcaption>
+            </figure>
+          );
+        }
+
+        return (
+          <p key={`paragraph-${index}-${paragraphIndex}`}>
+            {paragraph}
+          </p>
+        );
+      });
   });
 }
 
