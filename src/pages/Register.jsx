@@ -40,8 +40,10 @@ export default function Register() {
       showToast('Pendaftaran berhasil. Akun menunggu persetujuan pengurus.');
       navigate('/pending');
     } catch (error) {
-      showToast(error.message || 'Pendaftaran gagal.', 'error');
-    } finally {
+  console.error('REGISTER ERROR CODE:', error.code);
+  console.error('REGISTER ERROR MESSAGE:', error.message);
+  showToast(`${error.code || 'error'} - ${error.message || 'Pendaftaran gagal.'}`, 'error');
+} finally {
       setLoading(false);
     }
   }
