@@ -13,48 +13,73 @@ function renderContent(content) {
     ? content.join('\n\n')
     : String(content || '');
 
+  if (!rawContent.trim()) {
+    return null;
+  }
+
   const parts = rawContent.split(/```/g);
 
-  return parts.map((part, index) => {
+  return parts.flatMap((part, index) => {
     const isCodeBlock = index % 2 === 1;
 
     if (isCodeBlock) {
       const lines = part.replace(/^\n/, '').split('\n');
-      const language = lines[0]?.trim();
+      const language = lines[0]?.trim() || 'text';
       const code = lines.slice(1).join('\n').trimEnd();
 
-      return (
-        <pre className={`lesson-code-block language-${language || 'text'}`} key={`code-${index}`}>
+      return [
+        <pre
+          className={`lesson-code-block language-${language}`}
+          key={`code-${index}`}
+        >
           <code>{code}</code>
         </pre>
-      );
+      ];
     }
 
-    return part
+    const blocks = part
       .split(/\n{2,}/g)
-      .map((paragraph) => paragraph.trim())
-      .filter(Boolean)
-      .map((paragraph, paragraphIndex) => {
-        const imageMatch = paragraph.match(/^!\[(.*?)\]\((.*?)\)$/);
+      .map((block) => block.trim())
+      .filter(Boolean);
+
+    return blocks.flatMap((block, blockIndex) => {
+      const lines = block
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      return lines.map((line, lineIndex) => {
+        const imageMatch = line.match(/^!\[(.*?)\]\((.*?)\)$/);
 
         if (imageMatch) {
           const altText = imageMatch[1] || 'Gambar materi';
-          const imageUrl = imageMatch[2];
+          const imageUrl = imageMatch[2] || '';
 
           return (
-            <figure className="lesson-image-block" key={`image-${index}-${paragraphIndex}`}>
-              <img src={imageUrl} alt={altText} />
+            <figure
+              className="lesson-image-block"
+              key={`image-${index}-${blockIndex}-${lineIndex}`}
+            >
+              <img
+                src={imageUrl}
+                alt={altText}
+                loading="lazy"
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
+                }}
+              />
               <figcaption>{altText}</figcaption>
             </figure>
           );
         }
 
         return (
-          <p key={`paragraph-${index}-${paragraphIndex}`}>
-            {paragraph}
+          <p key={`paragraph-${index}-${blockIndex}-${lineIndex}`}>
+            {line}
           </p>
         );
       });
+    });
   });
 }
 
