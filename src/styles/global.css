@@ -2022,3 +2022,23 @@ flex-direction: column;
   padding-top: 0.8rem;
   border-top: 2px dashed var(--ink);
 }
+
+.lesson-code-block {
+  background: #101827;
+  color: #f8fafc !important;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  box-shadow: 4px 4px 0 var(--ink);
+  margin: 0.75rem 0;
+}
+
+.lesson-code-block code {
+  color: #f8fafc !important;
+  font-family: "Courier New", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

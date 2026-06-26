@@ -23,9 +23,26 @@ function renderQuizContent(content, keyPrefix = 'quiz-content') {
     const isCodeBlock = index % 2 === 1;
 
     if (isCodeBlock) {
-      const lines = part.replace(/^\n/, '').split('\n');
-      const language = lines[0]?.trim() || 'text';
-      const code = lines.slice(1).join('\n').trimEnd();
+      const cleanPart = part.replace(/^\n/, '').trimEnd();
+const lines = cleanPart.split('\n');
+
+let language = 'text';
+let code = cleanPart;
+
+const firstLine = lines[0]?.trim() || '';
+const knownLanguages = ['php', 'html', 'css', 'js', 'javascript', 'txt', 'sql', 'json'];
+
+if (lines.length > 1 && knownLanguages.includes(firstLine.toLowerCase())) {
+  language = firstLine.toLowerCase();
+  code = lines.slice(1).join('\n').trimEnd();
+} else {
+  const oneLineMatch = cleanPart.match(/^([a-zA-Z0-9_-]+)\s+([\s\S]*)$/);
+
+  if (oneLineMatch && knownLanguages.includes(oneLineMatch[1].toLowerCase())) {
+    language = oneLineMatch[1].toLowerCase();
+    code = oneLineMatch[2].trimEnd();
+  }
+}
 
       return [
         <pre
