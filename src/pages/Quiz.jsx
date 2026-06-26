@@ -8,7 +8,76 @@ import { useToast } from '../context/ToastContext';
 import { loadCourse, loadQuestions } from '../services/dataApi';
 import { applyQuizAttempt, applyQuizPass } from '../utils/progress';
 
+function renderQuizContent(content, keyPrefix = 'quiz-content') {
+  const rawContent = Array.isArray(content)
+    ? content.join('\n\n')
+    : String(content || '');
+
+  if (!rawContent.trim()) {
+    return null;
+  }
+
+  const parts = rawContent.split(/```/g);
+
+  return parts.flatMap((part, index) => {
+    const isCodeBlock = index % 2 === 1;
+
+    if (isCodeBlock) {
+      const lines = part.replace(/^\n/, '').split('\n');
+      const language = lines[0]?.trim() || 'text';
+      const code = lines.slice(1).join('\n').trimEnd();
+
+      return [
+        <pre
+          className={`lesson-code-block quiz-code-block language-${language}`}
+          key={`${keyPrefix}-code-${index}`}
+        >
+          <code>{code}</code>
+        </pre>
+      ];
+    }
+
+    const blocks = part
+      .split(/\n{2,}/g)
+      .map((block) => block.trim())
+      .filter(Boolean);
+
+    return blocks.flatMap((block, blockIndex) => {
+      const lines = block
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      return lines.map((line, lineIndex) => {
+        const imageMatch = line.match(/^!\[(.*?)\]\((.*?)\)$/);
+
+        if (imageMatch) {
+          const altText = imageMatch[1] || 'Gambar soal';
+          const imageUrl = imageMatch[2] || '';
+
+          return (
+            <figure
+              className="lesson-image-block quiz-image-block"
+              key={`${keyPrefix}-image-${index}-${blockIndex}-${lineIndex}`}
+            >
+              <img src={imageUrl} alt={altText} loading="lazy" />
+              <figcaption>{altText}</figcaption>
+            </figure>
+          );
+        }
+
+        return (
+          <p key={`${keyPrefix}-paragraph-${index}-${blockIndex}-${lineIndex}`}>
+            {line}
+          </p>
+        );
+      });
+    });
+  });
+}
+
 export default function Quiz() {
+
   const { stageId } = useParams();
   const navigate = useNavigate();
   const { currentMember, updateCurrentMember } = useAuth();
@@ -251,11 +320,38 @@ export default function Quiz() {
 
           return (
             <PixelCard className={correct ? 'review-card correct' : 'review-card wrong'} key={question.id}>
-              <h3>{question.question}</h3>
-              <p>Jawaban kamu: {question.options[userIndex] || 'Tidak dijawab'}</p>
-              <p>Jawaban benar: {question.options[question.correctIndex]}</p>
-              <small>{question.explanation}</small>
-            </PixelCard>
+  <div className="quiz-question-text">
+    {renderQuizContent(question.question, `review-question-${question.id}`)}
+  </div>
+
+  <div className="review-answer-block">
+    <strong>Jawaban kamu:</strong>
+
+    <div className="review-answer-content">
+      {question.options[userIndex]
+        ? renderQuizContent(question.options[userIndex], `user-answer-${question.id}`)
+        : <p>Tidak dijawab</p>}
+    </div>
+  </div>
+
+  <div className="review-answer-block">
+    <strong>Jawaban benar:</strong>
+
+    <div className="review-answer-content">
+      {renderQuizContent(question.options[question.correctIndex], `correct-answer-${question.id}`)}
+    </div>
+  </div>
+
+  {question.explanation ? (
+    <div className="review-explanation">
+      <strong>Pembahasan:</strong>
+
+      <div>
+        {renderQuizContent(question.explanation, `explanation-${question.id}`)}
+      </div>
+    </div>
+  ) : null}
+</PixelCard>
           );
         })}
       </section>
@@ -273,20 +369,25 @@ export default function Quiz() {
       </section>
 
       <PixelCard className="question-card">
-        <h2>{activeQuestion.question}</h2>
-        <div className="answer-grid">
-          {activeQuestion.options.map((option, index) => (
-            <button
-              className={Number(answers[activeQuestion.id]) === index ? 'answer-option selected' : 'answer-option'}
-              key={option}
-              type="button"
-              onClick={() => setAnswers({ ...answers, [activeQuestion.id]: index })}
-            >
-              {option}
-            </button>
-          ))}
-        </div>
-      </PixelCard>
+  <div className="quiz-question-text">
+    {renderQuizContent(activeQuestion.question, `question-${activeQuestion.id}`)}
+  </div>
+
+  <div className="answer-grid">
+  {activeQuestion.options.map((option, index) => (
+    <button
+      className={Number(answers[activeQuestion.id]) === index ? 'answer-option selected' : 'answer-option'}
+      key={`${activeQuestion.id}-${index}`}
+      type="button"
+      onClick={() => setAnswers({ ...answers, [activeQuestion.id]: index })}
+    >
+      <div className="answer-option-content">
+        {renderQuizContent(option, `option-${activeQuestion.id}-${index}`)}
+      </div>
+    </button>
+  ))}
+</div>
+</PixelCard>
 
       <div className="quiz-controls">
         <PixelButton

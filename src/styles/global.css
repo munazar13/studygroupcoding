@@ -1976,3 +1976,49 @@ flex-direction: column;
   font-weight: 800;
   color: var(--muted);
 }
+
+.quiz-question-text,
+.answer-option-content,
+.review-answer-content,
+.review-explanation {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.quiz-question-text p,
+.answer-option-content p,
+.review-answer-content p,
+.review-explanation p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.answer-option-content {
+  width: 100%;
+  text-align: left;
+}
+
+.quiz-code-block {
+  margin: 0.5rem 0;
+}
+
+.answer-option .lesson-code-block {
+  border-width: 2px;
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--ink);
+  font-size: 0.82rem;
+  margin: 0.4rem 0 0;
+  padding: 0.7rem;
+}
+
+.review-answer-block {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0.7rem 0;
+}
+
+.review-explanation {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 2px dashed var(--ink);
+}
