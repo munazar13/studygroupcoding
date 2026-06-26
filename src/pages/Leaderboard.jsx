@@ -212,6 +212,7 @@ export default function Leaderboard() {
 
                 <div className="leader-level-line">
                   <span>Level {member.level || 1}</span>
+                  {"  "}
                   <span>{Number(member.xp || 0)}/{Number(member.xpToNextLevel || 100)} XP</span>
                 </div>
 
