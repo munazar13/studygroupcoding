@@ -2165,3 +2165,37 @@ flex-direction: column;
   color: #ffffff !important;
   border: 2px solid #7f1d1d !important;
 }
+
+.admin-preview-box {
+  border: 3px dashed var(--ink);
+  border-radius: 16px;
+  padding: 1rem;
+  background: #f8fafc;
+  box-shadow: 3px 3px 0 var(--ink);
+  margin: 0.75rem 0;
+}
+
+.admin-preview-content {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.75rem;
+}
+
+.admin-preview-content p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.preview-empty {
+  color: var(--muted);
+  font-weight: 700;
+  font-style: italic;
+}
+
+.admin-preview-code {
+  margin: 0.4rem 0;
+}
+
+.admin-preview-image {
+  margin: 0.5rem 0;
+}

@@ -3,6 +3,7 @@ import LoadingState from '../components/LoadingState';
 import PixelButton from '../components/PixelButton';
 import PixelCard from '../components/PixelCard';
 import StatCard from '../components/StatCard';
+import AdminPreviewContent from '../components/AdminPreviewContent';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -831,7 +832,6 @@ async function handleRejectChallengeSubmission(submission) {
       value={courseForm.theme}
       onChange={(e) => setCourseForm({ ...courseForm, theme: e.target.value })}
     />
-
     <div className="form-row">
       <input
         required
@@ -1146,6 +1146,17 @@ async function handleRejectChallengeSubmission(submission) {
       onChange={(e) => setSectionForm({ ...sectionForm, content: e.target.value })}
     />
 
+    <div className="admin-preview-box">
+      <div className="section-title-row">
+        <h4>Preview Materi</h4>
+        <span>Code / gambar / paragraf</span>
+      </div>
+
+      <div className="admin-preview-content">
+        <AdminPreviewContent content={sectionForm.content} prefix="material-preview" />
+      </div>
+    </div>
+
     <textarea
       placeholder="Contoh kode, opsional"
       value={sectionForm.code}
@@ -1250,15 +1261,26 @@ async function handleRejectChallengeSubmission(submission) {
       onChange={(e) => setQuestionForm({ ...questionForm, question: e.target.value })}
     />
 
+    <div className="admin-preview-box">
+      <div className="section-title-row">
+        <h4>Preview Pertanyaan</h4>
+        <span>Soal</span>
+      </div>
+
+      <div className="admin-preview-content">
+        <AdminPreviewContent content={questionForm.question} prefix="question-preview" />
+      </div>
+    </div>
+
     <div className="form-row">
-      <input
+      <textarea
         required
         placeholder="Pilihan A"
         value={questionForm.optionA}
         onChange={(e) => setQuestionForm({ ...questionForm, optionA: e.target.value })}
       />
 
-      <input
+      <textarea
         required
         placeholder="Pilihan B"
         value={questionForm.optionB}
@@ -1267,21 +1289,57 @@ async function handleRejectChallengeSubmission(submission) {
     </div>
 
     <div className="form-row">
-      <input
+      <textarea
         required
         placeholder="Pilihan C"
         value={questionForm.optionC}
         onChange={(e) => setQuestionForm({ ...questionForm, optionC: e.target.value })}
       />
 
-      <input
+      <textarea
         required
         placeholder="Pilihan D"
         value={questionForm.optionD}
         onChange={(e) => setQuestionForm({ ...questionForm, optionD: e.target.value })}
-      
       />
     </div>
+
+    <div className="admin-preview-box">
+      <div className="section-title-row">
+        <h4>Preview Pilihan Jawaban</h4>
+        <span>A / B / C / D</span>
+      </div>
+
+      <div className="answer-preview-grid">
+        <div>
+          <strong>A</strong>
+          <div className="admin-preview-content">
+            <AdminPreviewContent content={questionForm.optionA} prefix="option-a-preview" />
+          </div>
+        </div>
+
+        <div>
+          <strong>B</strong>
+          <div className="admin-preview-content">
+            <AdminPreviewContent content={questionForm.optionB} prefix="option-b-preview" />
+          </div>
+        </div>
+
+        <div>
+          <strong>C</strong>
+          <div className="admin-preview-content">
+            <AdminPreviewContent content={questionForm.optionC} prefix="option-c-preview" />
+          </div>
+        </div>
+
+            <div>
+              <strong>D</strong>
+              <div className="admin-preview-content">
+                <AdminPreviewContent content={questionForm.optionD} prefix="option-d-preview" />
+              </div>
+            </div>
+          </div>
+        </div>
 
     <select
       value={questionForm.correctIndex}
@@ -1299,6 +1357,17 @@ async function handleRejectChallengeSubmission(submission) {
       value={questionForm.explanation}
       onChange={(e) => setQuestionForm({ ...questionForm, explanation: e.target.value })}
     />
+
+    <div className="admin-preview-box">
+      <div className="section-title-row">
+        <h4>Preview Pembahasan</h4>
+        <span>Penjelasan jawaban</span>
+      </div>
+
+      <div className="admin-preview-content">
+        <AdminPreviewContent content={questionForm.explanation} prefix="explanation-preview" />
+      </div>
+    </div>
 
     <label className="check-line">
       <input
