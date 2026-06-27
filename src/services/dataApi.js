@@ -719,6 +719,66 @@ export async function upsertQuestion(question) {
   await createActivity(`Soal stage ${normalized.courseId} diperbarui.`, 'question');
 }
 
+function normalizeAnnouncement(announcement = {}) {
+  const title = String(announcement.title || '').trim();
+  const id = String(
+    announcement.id || createSafeId(title || 'announcement', 'announcement')
+  ).trim();
+
+  return {
+    ...announcement,
+    id,
+    title,
+    category: String(announcement.category || 'Info').trim(),
+    message: String(announcement.message || '').trim(),
+    priority: String(announcement.priority || 'normal').trim(),
+    target: String(announcement.target || 'all').trim(),
+    pinned: announcement.pinned === true,
+    published: announcement.published !== false,
+    startDate: announcement.startDate || '',
+    endDate: announcement.endDate || '',
+    order: asNumber(announcement.order, 999),
+    createdAt: announcement.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+export async function loadAnnouncements(options = {}) {
+  const includeDrafts = options.includeDrafts === true;
+  const announcements = await getCollection('announcements');
+
+  return announcements
+    .map(normalizeAnnouncement)
+    .filter((announcement) => {
+      if (includeDrafts) return true;
+      return announcement.published !== false;
+    })
+    .sort((a, b) => {
+      if (a.pinned !== b.pinned) {
+        return a.pinned ? -1 : 1;
+      }
+
+      return Number(a.order || 999) - Number(b.order || 999);
+    });
+}
+
+export async function upsertAnnouncement(announcement) {
+  const normalized = normalizeAnnouncement(announcement);
+
+  if (!normalized.title) {
+    throw new Error('Judul pengumuman wajib diisi.');
+  }
+
+  if (!normalized.message) {
+    throw new Error('Isi pengumuman wajib diisi.');
+  }
+
+  await setDocument('announcements', normalized.id, normalized);
+  await createActivity(`Pengumuman ${normalized.title} diperbarui.`, 'announcement');
+
+  return normalized;
+}
+
 export async function upsertEvent(event) {
   const payload = {
     ...event,

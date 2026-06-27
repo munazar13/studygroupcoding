@@ -14,6 +14,7 @@ import {
   grantMemberReward,
   importSystemData,
   loadAdminContentData,
+  loadAnnouncements,
   loadChallengeData,
   loadLearningData,
   loadPublicData,
@@ -25,6 +26,7 @@ import {
   restoreBackupData,
   setMemberStatus,
   updateMemberAdminStats,
+  upsertAnnouncement,
   upsertChallenge,
   upsertCourse,
   upsertCourseSection,
@@ -42,6 +44,7 @@ const tabs = [
 { id: 'members', label: 'Anggota' },
 { id: 'learning-content', label: 'Konten Belajar' },
 { id: 'events', label: 'Agenda' },
+{ id: 'announcements', label: 'Pengumuman' },
 { id: 'docs', label: 'Dokumentasi' },
 { id: 'projects', label: 'Karya' },
 { id: 'challenges', label: 'Tantangan' },
@@ -109,6 +112,20 @@ const emptyQuestion = {
   correctIndex: 0,
   explanation: '',
   published: true
+};
+
+const emptyAnnouncement = {
+  id: '',
+  title: '',
+  category: 'Info',
+  message: '',
+  priority: 'normal',
+  target: 'all',
+  pinned: false,
+  published: true,
+  startDate: '',
+  endDate: '',
+  order: 999
 };
 
 const emptyEvent = {
@@ -209,13 +226,20 @@ export default function AdminPanel() {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
-  const [publicData, setPublicData] = useState({ founders: [], events: [], docs: [], projects: [] });
+  const [publicData, setPublicData] = useState({
+  founders: [],
+  events: [],
+  docs: [],
+  projects: [],
+  announcements: []
+  });
   const [learningData, setLearningData] = useState({ courses: [], rewards: [], ranks: [], members: [] });
   const [contentData, setContentData] = useState({ courses: [], courseSections: [], questions: [] });
   const [courseForm, setCourseForm] = useState(emptyCourse);
   const [sectionForm, setSectionForm] = useState(emptySection);
   const [questionForm, setQuestionForm] = useState(emptyQuestion);
   const [eventForm, setEventForm] = useState(emptyEvent);
+  const [announcementForm, setAnnouncementForm] = useState(emptyAnnouncement);
   const [docForm, setDocForm] = useState(emptyDoc);
   const [projectForm, setProjectForm] = useState(emptyProject);
   const [challengeData, setChallengeData] = useState({ challenges: [], challengeSubmissions: [] });
@@ -238,14 +262,24 @@ export default function AdminPanel() {
   setLoading(true);
 
   try {
-    const [publicResult, learningResult, contentResult, challengeResult] = await Promise.all([
-      loadPublicData(),
-      loadLearningData(),
-      loadAdminContentData(),
-      loadChallengeData()
-    ]);
+    const [
+  publicResult,
+  learningResult,
+  contentResult,
+  challengeResult,
+  announcementResult
+] = await Promise.all([
+  loadPublicData(),
+  loadLearningData(),
+  loadAdminContentData(),
+  loadChallengeData(),
+  loadAnnouncements({ includeDrafts: true })
+]);
 
-    setPublicData(publicResult);
+    setPublicData({
+  ...publicResult,
+  announcements: announcementResult
+});
     setLearningData(learningResult);
     setContentData(contentResult);
     setChallengeData(challengeResult);
@@ -749,6 +783,35 @@ function validateRewardForm() {
   return true;
 }
 
+function validateAnnouncementForm() {
+  if (isBlank(announcementForm.title)) {
+    showToast('Judul pengumuman wajib diisi.', 'error');
+    return false;
+  }
+
+  if (isBlank(announcementForm.message)) {
+    showToast('Isi pengumuman wajib diisi.', 'error');
+    return false;
+  }
+
+  if (asPositiveNumber(announcementForm.order, 0) < 1) {
+    showToast('Urutan pengumuman minimal 1.', 'error');
+    return false;
+  }
+
+  if (announcementForm.startDate && announcementForm.endDate) {
+    const startDate = new Date(announcementForm.startDate);
+    const endDate = new Date(announcementForm.endDate);
+
+    if (startDate > endDate) {
+      showToast('Tanggal mulai tidak boleh lebih besar dari tanggal berakhir.', 'error');
+      return false;
+    }
+  }
+
+  return true;
+}
+
   async function handleImportSystem() {
     try {
       const count = await importSystemData();
@@ -1004,6 +1067,23 @@ async function handleCleanSelectedMemberData() {
     await reload();
   } catch (error) {
     showToast(error.message || 'Soal gagal disimpan.', 'error');
+  }
+}
+
+async function handleAnnouncementSubmit(event) {
+  event.preventDefault();
+
+  if (!validateAnnouncementForm()) return;
+
+  try {
+    await upsertAnnouncement(announcementForm);
+
+    setAnnouncementForm(emptyAnnouncement);
+    showToast('Pengumuman berhasil disimpan.');
+    await reload();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Pengumuman gagal disimpan.', 'error');
   }
 }
 
@@ -2842,6 +2922,199 @@ async function handleRejectChallengeSubmission(submission) {
           </div>
         </section>
       ) : null}
+
+      {activeTab === 'announcements' ? (
+  <section className="admin-editor-grid">
+    <PixelCard>
+      <h2>Tambah / Edit Pengumuman</h2>
+
+      <form className="form-stack" onSubmit={handleAnnouncementSubmit}>
+        <label className="form-field">
+          <span>Judul Pengumuman</span>
+          <input
+            required
+            placeholder="Contoh: Kelas PHP dimulai minggu ini"
+            value={announcementForm.title}
+            onChange={(e) => setAnnouncementForm({ ...announcementForm, title: e.target.value })}
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Kategori</span>
+          <select
+            value={announcementForm.category}
+            onChange={(e) => setAnnouncementForm({ ...announcementForm, category: e.target.value })}
+          >
+            <option value="Info">Info</option>
+            <option value="Penting">Penting</option>
+            <option value="Kelas">Kelas</option>
+            <option value="Challenge">Challenge</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+        </label>
+
+        <label className="form-field">
+          <span>Isi Pengumuman</span>
+          <textarea
+            required
+            placeholder="Tulis isi pengumuman untuk member."
+            value={announcementForm.message}
+            onChange={(e) => setAnnouncementForm({ ...announcementForm, message: e.target.value })}
+          />
+        </label>
+
+        <div className="form-row">
+          <label className="form-field">
+            <span>Prioritas</span>
+            <select
+              value={announcementForm.priority}
+              onChange={(e) => setAnnouncementForm({ ...announcementForm, priority: e.target.value })}
+            >
+              <option value="normal">Normal</option>
+              <option value="high">Penting</option>
+              <option value="urgent">Mendesak</option>
+            </select>
+          </label>
+
+          <label className="form-field">
+            <span>Target</span>
+            <select
+              value={announcementForm.target}
+              onChange={(e) => setAnnouncementForm({ ...announcementForm, target: e.target.value })}
+            >
+              <option value="all">Semua Member</option>
+              <option value="pending">Member Pending</option>
+              <option value="approved">Member Approved</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="form-row">
+          <label className="form-field">
+            <span>Tanggal Mulai</span>
+            <input
+              type="date"
+              value={announcementForm.startDate}
+              onChange={(e) => setAnnouncementForm({ ...announcementForm, startDate: e.target.value })}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Tanggal Berakhir</span>
+            <input
+              type="date"
+              value={announcementForm.endDate}
+              onChange={(e) => setAnnouncementForm({ ...announcementForm, endDate: e.target.value })}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Urutan</span>
+            <input
+              type="number"
+              min="1"
+              value={announcementForm.order}
+              onChange={(e) => setAnnouncementForm({ ...announcementForm, order: e.target.value })}
+            />
+          </label>
+        </div>
+
+        <label className="check-line">
+          <input
+            type="checkbox"
+            checked={announcementForm.pinned}
+            onChange={(e) => setAnnouncementForm({ ...announcementForm, pinned: e.target.checked })}
+          />
+          Pin pengumuman di atas
+        </label>
+
+        <label className="check-line">
+          <input
+            type="checkbox"
+            checked={announcementForm.published}
+            onChange={(e) => setAnnouncementForm({ ...announcementForm, published: e.target.checked })}
+          />
+          Published
+        </label>
+
+        <div className="member-actions">
+          <PixelButton type="submit">
+            Simpan Pengumuman
+          </PixelButton>
+
+          <PixelButton
+            type="button"
+            variant="secondary"
+            onClick={() => setAnnouncementForm(emptyAnnouncement)}
+          >
+            Pengumuman Baru
+          </PixelButton>
+        </div>
+      </form>
+    </PixelCard>
+
+    <div className="admin-list">
+      {(publicData.announcements || []).length ? (
+        (publicData.announcements || []).map((announcement) => (
+          <PixelCard
+            className={`announcement-admin-card priority-${announcement.priority || 'normal'}`}
+            key={announcement.id}
+          >
+            <div className="section-title-row">
+              <div>
+                <p className="eyebrow">
+                  {announcement.category || 'Info'}
+                  {announcement.pinned ? ' · Pinned' : ''}
+                </p>
+
+                <h3>{announcement.title}</h3>
+              </div>
+
+              <span className={`announcement-priority ${announcement.priority || 'normal'}`}>
+                {announcement.priority || 'normal'}
+              </span>
+            </div>
+
+            <p>{announcement.message}</p>
+
+            <div className="announcement-admin-meta">
+              <span>{announcement.published !== false ? 'Published' : 'Draft'}</span>
+              <span>Target: {announcement.target || 'all'}</span>
+              <span>Urutan: {announcement.order || 999}</span>
+            </div>
+
+            <div className="member-actions">
+              <PixelButton
+                type="button"
+                variant="secondary"
+                onClick={() => setAnnouncementForm({
+                  ...emptyAnnouncement,
+                  ...announcement,
+                  published: announcement.published !== false
+                })}
+              >
+                Edit
+              </PixelButton>
+
+              <PixelButton
+                type="button"
+                variant="danger"
+                onClick={() => handleDelete('announcements', announcement.id)}
+              >
+                Hapus
+              </PixelButton>
+            </div>
+          </PixelCard>
+        ))
+      ) : (
+        <PixelCard>
+          <h3>Belum ada pengumuman</h3>
+          <p>Buat pengumuman pertama lewat form di samping.</p>
+        </PixelCard>
+      )}
+    </div>
+  </section>
+) : null}
 
       {activeTab === 'events' ? (
         <section className="admin-editor-grid">
