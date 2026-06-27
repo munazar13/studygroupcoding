@@ -262,8 +262,7 @@ export default function Leaderboard() {
         <h3>Aturan Ranking</h3>
         <p>
           Rank Utama memakai urutan: level tertinggi, XP bar tertinggi, total XP,
-          lalu jumlah stage selesai. XP tidak ditampilkan besar-besar, cukup lewat
-          bar supaya leaderboard tetap rapi.
+          lalu jumlah stage selesai. 
         </p>
       </PixelCard>
     </main>

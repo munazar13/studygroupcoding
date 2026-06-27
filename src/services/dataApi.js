@@ -9,6 +9,7 @@ import {
 } from './firebase';
 
 import { addCoinsToMember, addXpToMember } from '../utils/levelSystem';
+import { normalizeRarity } from '../utils/rarity';
 import seedRewards from '../data/rewards.json';
 import seedRanks from '../data/ranks.json';
 import seedFounders from '../data/founders.json';
@@ -149,6 +150,43 @@ function normalizeQuestion(question) {
     options,
     correctIndex: asNumber(question.correctIndex, 0),
     published: question.published !== false
+  };
+}
+
+function normalizeReward(reward) {
+  if (!reward) return null;
+
+  const type = String(reward.type || reward.category || 'badge')
+    .trim()
+    .toLowerCase();
+
+  const name = String(reward.name || reward.title || '')
+    .trim();
+
+  const id = String(
+    reward.id || createSafeId(name || type, type)
+  ).trim();
+
+  const now = new Date().toISOString();
+
+  return {
+    ...reward,
+    id,
+    type,
+    category: type,
+    name,
+    title: name,
+    description: String(reward.description || '').trim(),
+    icon: String(
+      reward.icon || (type === 'title' ? '🎖️' : type === 'chest' ? '🎁' : '🏅')
+    ).trim(),
+    rarity: normalizeRarity(reward.rarity || 'common'),
+    requirement: String(reward.requirement || '').trim(),
+    source: String(reward.source || 'master').trim(),
+    published: reward.published !== false,
+    order: asNumber(reward.order, 999),
+    createdAt: reward.createdAt || now,
+    updatedAt: now
   };
 }
 
@@ -720,6 +758,38 @@ export async function upsertProject(project) {
 
   await setDocument('projects', project.id || `project-${Date.now()}`, payload);
   await createActivity(`Karya ${payload.title} diperbarui.`, 'project');
+}
+
+export async function upsertReward(reward) {
+  const normalized = normalizeReward(reward);
+
+  if (!normalized || !normalized.id) {
+    throw new Error('Reward tidak valid.');
+  }
+
+  if (!normalized.name) {
+    throw new Error('Nama reward wajib diisi.');
+  }
+
+  if (!['badge', 'title', 'chest'].includes(normalized.type)) {
+    throw new Error('Jenis reward harus badge, title, atau chest.');
+  }
+
+  await setDocument('rewards', normalized.id, normalized);
+  await createActivity(`Reward ${normalized.name} diperbarui.`, 'reward');
+
+  return normalized;
+}
+
+export async function deleteReward(rewardId) {
+  const cleanId = String(rewardId || '').trim();
+
+  if (!cleanId) {
+    throw new Error('Reward tidak valid.');
+  }
+
+  await deleteDocument('rewards', cleanId);
+  await createActivity(`Reward ${cleanId} dihapus.`, 'reward');
 }
 
 export async function upsertChallenge(challenge) {

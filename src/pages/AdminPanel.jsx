@@ -22,10 +22,12 @@ import {
   upsertDoc,
   upsertEvent,
   upsertProject,
-  upsertQuestion
+  upsertQuestion,
+  upsertReward,
+  deleteReward
 } from '../services/dataApi';
 import { downloadTextFile } from '../utils/download';
-
+import { RARITY_LIST, getRarityLabel } from '../utils/rarity';
 const tabs = [
 { id: 'overview', label: 'Ringkasan' },
 { id: 'members', label: 'Anggota' },
@@ -34,6 +36,7 @@ const tabs = [
 { id: 'docs', label: 'Dokumentasi' },
 { id: 'projects', label: 'Karya' },
 { id: 'challenges', label: 'Tantangan' },
+{ id: 'rewards', label: 'Reward' },
 { id: 'backup', label: 'Backup' }
 ];
 
@@ -152,6 +155,18 @@ const emptyChallenge = {
   order: 1
 };
 
+const emptyReward = {
+  id: '',
+  type: 'badge',
+  name: '',
+  icon: '🏅',
+  rarity: 'common',
+  description: '',
+  requirement: '',
+  published: true,
+  order: 999
+};
+
 function readImageAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -196,6 +211,7 @@ export default function AdminPanel() {
   const [projectForm, setProjectForm] = useState(emptyProject);
   const [challengeData, setChallengeData] = useState({ challenges: [], challengeSubmissions: [] });
   const [challengeForm, setChallengeForm] = useState(emptyChallenge);
+  const [rewardForm, setRewardForm] = useState(emptyReward);
   const [selectedCourseId, setSelectedCourseId] = useState('');
 
   async function reload() {
@@ -248,6 +264,31 @@ const selectedCourseQuestions = useMemo(() => {
     .filter((question) => String(question.courseId) === String(activeCourseId))
     .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
 }, [contentData.questions, activeCourseId]);
+
+const masterRewards = useMemo(() => {
+  return [...(learningData.rewards || [])].sort((a, b) => {
+    const typeCompare = String(a.type || a.category || '').localeCompare(
+      String(b.type || b.category || '')
+    );
+
+    if (typeCompare !== 0) return typeCompare;
+
+    return Number(a.order || 999) - Number(b.order || 999);
+  });
+}, [learningData.rewards]);
+
+const badgeRewards = useMemo(() => {
+  return masterRewards.filter((reward) => String(reward.type || reward.category) === 'badge');
+}, [masterRewards]);
+
+const titleRewards = useMemo(() => {
+  return masterRewards.filter((reward) => String(reward.type || reward.category) === 'title');
+}, [masterRewards]);
+
+const chestRewards = useMemo(() => {
+  return masterRewards.filter((reward) => String(reward.type || reward.category) === 'chest');
+}, [masterRewards]);
+
 useEffect(() => {
 if (!selectedCourse || activeTab !== 'learning-content') return;
 
@@ -271,6 +312,8 @@ chestIcon: selectedCourse.chestIcon || '🎁',
 chestRarity: selectedCourse.chestRarity || 'common',
 published: selectedCourse.published !== false
 });
+
+
 
 setSectionForm((current) => ({
 ...current,
@@ -400,6 +443,53 @@ courseId: String(selectedCourse.id || '')
     showToast('Karya anggota berhasil disimpan.');
     await reload();
   }
+
+  async function handleRewardSubmit(event) {
+  event.preventDefault();
+
+  try {
+    await upsertReward(rewardForm);
+
+    setRewardForm(emptyReward);
+    showToast('Reward berhasil disimpan.');
+    await reload();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Reward gagal disimpan.', 'error');
+  }
+}
+
+function handleEditReward(reward) {
+  setRewardForm({
+    id: reward.id || '',
+    type: reward.type || reward.category || 'badge',
+    name: reward.name || reward.title || '',
+    icon: reward.icon || '🏅',
+    rarity: reward.rarity || 'common',
+    description: reward.description || '',
+    requirement: reward.requirement || '',
+    published: reward.published !== false,
+    order: Number(reward.order || 999)
+  });
+
+  setActiveTab('rewards');
+}
+
+async function handleDeleteReward(rewardId) {
+  const confirmed = window.confirm('Yakin ingin menghapus reward ini?');
+
+  if (!confirmed) return;
+
+  try {
+    await deleteReward(rewardId);
+
+    showToast('Reward berhasil dihapus.');
+    await reload();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Reward gagal dihapus.', 'error');
+  }
+}
 
   async function handleChallengeSubmit(event) {
   event.preventDefault();
@@ -1913,6 +2003,235 @@ async function handleRejectChallengeSubmission(submission) {
     </section>
   </>
 ) : null}
+
+      {activeTab === 'rewards' ? (
+  <section className="admin-editor-grid">
+    <PixelCard>
+      <h2>Reward Master Admin</h2>
+      <p>Kelola badge, title, dan chest yang bisa dipakai untuk stage atau tantangan.</p>
+
+      <form className="form-stack" onSubmit={handleRewardSubmit}>
+        <label className="form-field">
+          <span>Jenis Reward</span>
+          <select
+            value={rewardForm.type}
+            onChange={(e) => {
+              const type = e.target.value;
+
+              setRewardForm({
+                ...rewardForm,
+                type,
+                icon: type === 'title' ? '🎖️' : type === 'chest' ? '🎁' : '🏅'
+              });
+            }}
+          >
+            <option value="badge">Badge</option>
+            <option value="title">Title</option>
+            <option value="chest">Chest</option>
+          </select>
+        </label>
+
+        <label className="form-field">
+          <span>ID Reward</span>
+          <input
+            placeholder="Boleh kosong, nanti dibuat otomatis"
+            value={rewardForm.id}
+            onChange={(e) => setRewardForm({ ...rewardForm, id: e.target.value })}
+          />
+          <small>Contoh: badge-html-warrior, title-code-slayer, chest-basic-html.</small>
+        </label>
+
+        <label className="form-field">
+          <span>Nama Reward</span>
+          <input
+            required
+            placeholder="Contoh: HTML Warrior"
+            value={rewardForm.name}
+            onChange={(e) => setRewardForm({ ...rewardForm, name: e.target.value })}
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Deskripsi</span>
+          <textarea
+            placeholder="Contoh: Diberikan kepada anggota yang menaklukkan dasar HTML."
+            value={rewardForm.description}
+            onChange={(e) => setRewardForm({ ...rewardForm, description: e.target.value })}
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Syarat Mendapatkan</span>
+          <textarea
+            placeholder="Contoh: Selesaikan Stage 1 atau menangkan challenge HTML."
+            value={rewardForm.requirement}
+            onChange={(e) => setRewardForm({ ...rewardForm, requirement: e.target.value })}
+          />
+        </label>
+
+        <div className="form-row">
+          <label className="form-field">
+            <span>Icon</span>
+            <input
+              placeholder="Contoh: 🏅"
+              value={rewardForm.icon}
+              onChange={(e) => setRewardForm({ ...rewardForm, icon: e.target.value })}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Rarity</span>
+            <select
+              value={rewardForm.rarity}
+              onChange={(e) => setRewardForm({ ...rewardForm, rarity: e.target.value })}
+            >
+              {RARITY_LIST.map((rarity) => (
+                <option key={rarity} value={rarity}>
+                  {getRarityLabel(rarity)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <label className="form-field">
+          <span>Urutan</span>
+          <input
+            type="number"
+            min="1"
+            value={rewardForm.order}
+            onChange={(e) => setRewardForm({ ...rewardForm, order: e.target.value })}
+          />
+        </label>
+
+        <label className="check-line">
+          <input
+            type="checkbox"
+            checked={rewardForm.published}
+            onChange={(e) => setRewardForm({ ...rewardForm, published: e.target.checked })}
+          />
+          Published
+        </label>
+
+        <div className="member-actions">
+          <PixelButton type="submit">
+            Simpan Reward
+          </PixelButton>
+
+          <PixelButton
+            type="button"
+            variant="secondary"
+            onClick={() => setRewardForm(emptyReward)}
+          >
+            Reward Baru
+          </PixelButton>
+        </div>
+      </form>
+    </PixelCard>
+
+    <div className="admin-list">
+      <PixelCard>
+        <h3>Badge</h3>
+        {badgeRewards.length ? badgeRewards.map((reward) => (
+          <div className="editor-card" key={reward.id}>
+            <div>
+              <strong>{reward.icon || '🏅'} {reward.name || reward.title}</strong>
+              <p>{getRarityLabel(reward.rarity)} · {reward.published !== false ? 'Published' : 'Draft'}</p>
+              <small>{reward.description || 'Tanpa deskripsi.'}</small>
+            </div>
+
+            <div className="member-actions">
+              <PixelButton
+                type="button"
+                variant="secondary"
+                onClick={() => handleEditReward(reward)}
+              >
+                Edit
+              </PixelButton>
+
+              <PixelButton
+                type="button"
+                variant="danger"
+                onClick={() => handleDeleteReward(reward.id)}
+              >
+                Hapus
+              </PixelButton>
+            </div>
+          </div>
+        )) : (
+          <p>Belum ada badge.</p>
+        )}
+      </PixelCard>
+
+      <PixelCard>
+        <h3>Title</h3>
+        {titleRewards.length ? titleRewards.map((reward) => (
+          <div className="editor-card" key={reward.id}>
+            <div>
+              <strong>{reward.icon || '🎖️'} {reward.name || reward.title}</strong>
+              <p>{getRarityLabel(reward.rarity)} · {reward.published !== false ? 'Published' : 'Draft'}</p>
+              <small>{reward.description || 'Tanpa deskripsi.'}</small>
+            </div>
+
+            <div className="member-actions">
+              <PixelButton
+                type="button"
+                variant="secondary"
+                onClick={() => handleEditReward(reward)}
+              >
+                Edit
+              </PixelButton>
+
+              <PixelButton
+                type="button"
+                variant="danger"
+                onClick={() => handleDeleteReward(reward.id)}
+              >
+                Hapus
+              </PixelButton>
+            </div>
+          </div>
+        )) : (
+          <p>Belum ada title.</p>
+        )}
+      </PixelCard>
+
+      <PixelCard>
+        <h3>Chest</h3>
+        {chestRewards.length ? chestRewards.map((reward) => (
+          <div className="editor-card" key={reward.id}>
+            <div>
+              <strong>{reward.icon || '🎁'} {reward.name || reward.title}</strong>
+              <p>{getRarityLabel(reward.rarity)} · {reward.published !== false ? 'Published' : 'Draft'}</p>
+              <small>{reward.description || 'Tanpa deskripsi.'}</small>
+            </div>
+
+            <div className="member-actions">
+              <PixelButton
+                type="button"
+                variant="secondary"
+                onClick={() => handleEditReward(reward)}
+              >
+                Edit
+              </PixelButton>
+
+              <PixelButton
+                type="button"
+                variant="danger"
+                onClick={() => handleDeleteReward(reward.id)}
+              >
+                Hapus
+              </PixelButton>
+            </div>
+          </div>
+        )) : (
+          <p>Belum ada chest.</p>
+        )}
+      </PixelCard>
+    </div>
+  </section>
+) : null}
+
 
       {activeTab === 'backup' ? (
         <PixelCard>
