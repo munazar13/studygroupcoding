@@ -79,7 +79,7 @@ export default function Register() {
             <select
             name="cohort"
             value={form.cohort}
-            onChange={handleChange}
+            onChange={(event) => setForm({...form, cohort: event.target.value })}
             required
           >
             <option value="">Pilih Letting</option>
