@@ -3057,54 +3057,57 @@ async function handleRejectChallengeSubmission(submission) {
       {(publicData.announcements || []).length ? (
         (publicData.announcements || []).map((announcement) => (
           <PixelCard
-            className={`announcement-admin-card priority-${announcement.priority || 'normal'}`}
-            key={announcement.id}
-          >
-            <div className="section-title-row">
-              <div>
-                <p className="eyebrow">
-                  {announcement.category || 'Info'}
-                  {announcement.pinned ? ' · Pinned' : ''}
-                </p>
+  className={`admin-announcement-card priority-${announcement.priority || 'normal'}`}
+  key={announcement.id}
+>
+  <div className="admin-announcement-top">
+    <div>
+      <div className="admin-announcement-badges">
+        <span>{announcement.category || 'Info'}</span>
 
-                <h3>{announcement.title}</h3>
-              </div>
+        {announcement.pinned ? (
+          <span>Pinned</span>
+        ) : null}
 
-              <span className={`announcement-priority ${announcement.priority || 'normal'}`}>
-                {announcement.priority || 'normal'}
-              </span>
-            </div>
+        <span>{announcement.priority || 'normal'}</span>
+      </div>
 
-            <p>{announcement.message}</p>
+      <h3>{announcement.title}</h3>
+    </div>
+  </div>
 
-            <div className="announcement-admin-meta">
-              <span>{announcement.published !== false ? 'Published' : 'Draft'}</span>
-              <span>Target: {announcement.target || 'all'}</span>
-              <span>Urutan: {announcement.order || 999}</span>
-            </div>
+  <p className="admin-announcement-message">
+    {announcement.message}
+  </p>
 
-            <div className="member-actions">
-              <PixelButton
-                type="button"
-                variant="secondary"
-                onClick={() => setAnnouncementForm({
-                  ...emptyAnnouncement,
-                  ...announcement,
-                  published: announcement.published !== false
-                })}
-              >
-                Edit
-              </PixelButton>
+  <div className="admin-announcement-meta">
+    <span>{announcement.published !== false ? 'Published' : 'Draft'}</span>
+    <span>Target: {announcement.target || 'all'}</span>
+    <span>Urutan: {announcement.order || 999}</span>
+  </div>
 
-              <PixelButton
-                type="button"
-                variant="danger"
-                onClick={() => handleDelete('announcements', announcement.id)}
-              >
-                Hapus
-              </PixelButton>
-            </div>
-          </PixelCard>
+  <div className="member-actions">
+    <PixelButton
+      type="button"
+      variant="secondary"
+      onClick={() => setAnnouncementForm({
+        ...emptyAnnouncement,
+        ...announcement,
+        published: announcement.published !== false
+      })}
+    >
+      Edit
+    </PixelButton>
+
+    <PixelButton
+      type="button"
+      variant="danger"
+      onClick={() => handleDelete('announcements', announcement.id)}
+    >
+      Hapus
+    </PixelButton>
+  </div>
+</PixelCard>
         ))
       ) : (
         <PixelCard>
