@@ -2482,3 +2482,33 @@ flex-direction: column;
   margin: 0.35rem 0 0;
   font-weight: 700;
 }
+
+.member-grant-preview.already-owned {
+  background: #fee2e2;
+  border-color: #991b1b;
+}
+
+.member-grant-type,
+.member-owned-warning {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.2rem 0.55rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.member-owned-warning {
+  border-color: #991b1b;
+  background: #dc2626;
+  color: #ffffff;
+}
+
+.pixel-button:disabled,
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+}

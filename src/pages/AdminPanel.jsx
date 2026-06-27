@@ -315,6 +315,18 @@ const selectedMember = useMemo(() => {
   }) || null;
 }, [allMembers, selectedMemberId]);
 
+const selectedGrantReward = useMemo(() => {
+  if (!memberRewardGrantId) return null;
+
+  return masterRewards.find((reward) => {
+    return String(reward.id) === String(memberRewardGrantId);
+  }) || null;
+}, [masterRewards, memberRewardGrantId]);
+
+const selectedMemberAlreadyHasReward = useMemo(() => {
+  return memberHasReward(selectedMember, selectedGrantReward);
+}, [selectedMember, selectedGrantReward]);
+
 useEffect(() => {
   if (!selectedMember) return;
 
@@ -358,6 +370,38 @@ function getRewardLabel(rewardId, fallbackIcon = '🏅') {
   }
 
   return `${reward.icon || fallbackIcon} ${reward.name || reward.title || reward.id}`;
+}
+
+function memberHasReward(member, reward) {
+  if (!member || !reward) return false;
+
+  const rewardId = String(reward.id || '').trim();
+  const rewardType = String(reward.type || reward.category || '').trim();
+
+  if (!rewardId) return false;
+
+  if (rewardType === 'badge') {
+    return [
+      ...(member.badges || []),
+      ...(member.ownedBadges || [])
+    ].map(String).includes(rewardId);
+  }
+
+  if (rewardType === 'title') {
+    return [
+      ...(member.titles || []),
+      ...(member.ownedTitles || [])
+    ].map(String).includes(rewardId);
+  }
+
+  if (rewardType === 'chest') {
+    return [
+      ...(member.unopenedChests || []),
+      ...(member.openedChests || [])
+    ].map(String).includes(rewardId);
+  }
+
+  return (member.unlockedRewards || []).map(String).includes(rewardId);
 }
 
 function isMemberCompletedCourse(member, course) {
@@ -498,12 +542,15 @@ function appendToQuestionField(fieldName, snippet) {
 
   if (!selectedMember) return;
 
-  const reward = masterRewards.find((item) => {
-    return String(item.id) === String(memberRewardGrantId);
-  });
+  const reward = selectedGrantReward;
 
   if (!reward) {
     showToast('Pilih reward terlebih dahulu.', 'error');
+    return;
+  }
+
+  if (memberHasReward(selectedMember, reward)) {
+    showToast('Member sudah memiliki reward ini.', 'error');
     return;
   }
 
@@ -1235,42 +1282,50 @@ async function handleRejectChallengeSubmission(submission) {
       >
         <option value="">Pilih reward master</option>
 
-        {masterRewards.map((reward) => (
-          <option key={reward.id} value={reward.id}>
-            {reward.icon || '🎁'} {reward.name || reward.title || reward.id} · {reward.type || reward.category} · {getRarityLabel(reward.rarity)}
-          </option>
-        ))}
+        {masterRewards.map((reward) => {
+  const alreadyOwned = memberHasReward(selectedMember, reward);
+
+  return (
+    <option key={reward.id} value={reward.id}>
+      {reward.icon || '🎁'} {reward.name || reward.title || reward.id} · {reward.type || reward.category} · {getRarityLabel(reward.rarity)}
+      {alreadyOwned ? ' · Sudah dimiliki' : ''}
+    </option>
+  );
+})}
       </select>
     </label>
 
-    <PixelButton type="submit">
-      Berikan Reward
-    </PixelButton>
+    <PixelButton
+  type="submit"
+  disabled={!memberRewardGrantId || selectedMemberAlreadyHasReward}
+>
+  {selectedMemberAlreadyHasReward ? 'Sudah Dimiliki' : 'Berikan Reward'}
+</PixelButton>
   </div>
 
-  {memberRewardGrantId ? (
-    <div className="member-grant-preview">
-      {(() => {
-        const reward = masterRewards.find((item) => String(item.id) === String(memberRewardGrantId));
+  {selectedGrantReward ? (
+  <div className={selectedMemberAlreadyHasReward ? 'member-grant-preview already-owned' : 'member-grant-preview'}>
+    <strong>
+      {selectedGrantReward.icon || '🎁'} {selectedGrantReward.name || selectedGrantReward.title || selectedGrantReward.id}
+    </strong>
 
-        if (!reward) return null;
+    <span className={`admin-rarity-pill ${getRarityClassName(selectedGrantReward.rarity)}`}>
+      {getRarityLabel(selectedGrantReward.rarity)}
+    </span>
 
-        return (
-          <>
-            <strong>
-              {reward.icon || '🎁'} {reward.name || reward.title || reward.id}
-            </strong>
+    <span className="member-grant-type">
+      {selectedGrantReward.type || selectedGrantReward.category}
+    </span>
 
-            <span className={`admin-rarity-pill ${getRarityClassName(reward.rarity)}`}>
-              {getRarityLabel(reward.rarity)}
-            </span>
+    {selectedMemberAlreadyHasReward ? (
+      <span className="member-owned-warning">
+        Sudah dimiliki member
+      </span>
+    ) : null}
 
-            <p>{reward.description || 'Tidak ada deskripsi.'}</p>
-          </>
-        );
-      })()}
-    </div>
-  ) : null}
+    <p>{selectedGrantReward.description || 'Tidak ada deskripsi.'}</p>
+  </div>
+) : null}
 </form>
 
           <div className="member-detail-grid">
