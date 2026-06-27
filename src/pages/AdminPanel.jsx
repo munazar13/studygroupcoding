@@ -2924,7 +2924,7 @@ async function handleRejectChallengeSubmission(submission) {
       ) : null}
 
       {activeTab === 'announcements' ? (
-  <section className="admin-editor-grid">
+  <section className="admin-editor-grid announcements-admin-layout">
     <PixelCard>
       <h2>Tambah / Edit Pengumuman</h2>
 
