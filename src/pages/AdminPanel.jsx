@@ -231,7 +231,9 @@ export default function AdminPanel() {
   coins: 0
 });
   const [memberRewardGrantId, setMemberRewardGrantId] = useState('');
-
+  const [memberSearch, setMemberSearch] = useState('');
+  const [memberStatusFilter, setMemberStatusFilter] = useState('all');
+  const [memberCohortFilter, setMemberCohortFilter] = useState('all');
   async function reload() {
   setLoading(true);
 
@@ -261,6 +263,44 @@ export default function AdminPanel() {
 
   const pendingMembers = useMemo(() => learningData.members.filter((member) => member.status === 'pending'), [learningData]);
   const allMembers = learningData.members;
+  const memberCohortOptions = useMemo(() => {
+  return Array.from(
+    new Set(
+      allMembers
+        .map((member) => String(member.cohort || member.letting || member.angkatan || '').trim())
+        .filter(Boolean)
+    )
+  ).sort();
+}, [allMembers]);
+
+const filteredMembers = useMemo(() => {
+  const search = memberSearch.toLowerCase().trim();
+
+  return allMembers.filter((member) => {
+    const name = String(member.name || '').toLowerCase();
+    const nim = String(member.nim || '').toLowerCase();
+    const cohort = String(member.cohort || member.letting || member.angkatan || '').toLowerCase();
+    const status = String(member.status || 'pending').toLowerCase();
+
+    const matchesSearch =
+      !search ||
+      name.includes(search) ||
+      nim.includes(search) ||
+      cohort.includes(search) ||
+      status.includes(search);
+
+    const matchesStatus =
+      memberStatusFilter === 'all' ||
+      status === memberStatusFilter;
+
+    const matchesCohort =
+      memberCohortFilter === 'all' ||
+      cohort === String(memberCohortFilter).toLowerCase();
+
+    return matchesSearch && matchesStatus && matchesCohort;
+  });
+}, [allMembers, memberSearch, memberStatusFilter, memberCohortFilter]);
+
   const sortedCourses = useMemo(() => {
   return [...contentData.courses].sort((a, b) => Number(a.order || a.stage || 0) - Number(b.order || b.stage || 0));
 }, [contentData.courses]);
@@ -1059,8 +1099,87 @@ async function handleRejectChallengeSubmission(submission) {
 
       {activeTab === 'members' ? (
   <>
+    <section className="member-filter-panel">
+      <div>
+        <p className="eyebrow">Filter Anggota</p>
+        <h2>Cari dan Saring Member</h2>
+        <p>
+          Total {allMembers.length} anggota, tampil {filteredMembers.length} anggota.
+        </p>
+      </div>
+
+      <div className="member-filter-grid">
+        <label className="form-field">
+          <span>Cari Nama / NIM / Letting</span>
+          <input
+            type="text"
+            placeholder="Contoh: Syamil, 230..., 2024"
+            value={memberSearch}
+            onChange={(e) => setMemberSearch(e.target.value)}
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Status</span>
+          <select
+            value={memberStatusFilter}
+            onChange={(e) => setMemberStatusFilter(e.target.value)}
+          >
+            <option value="all">Semua Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </label>
+
+        <label className="form-field">
+          <span>Letting</span>
+          <select
+            value={ />
+        </label>
+
+        <label className="form-field">
+          <span>Status</span>
+          <select
+            value={memberStatusFilter}
+            onChange={(e) => setMemberStatusFilter(e.target.value)}
+          >
+            <option value="all">Semua Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </label>
+
+        <label className="memberCohortFilter}
+            onChange={(e) => setMemberCohortFilter(e.target.value)}
+          >
+            <option value="all">Semua Letting</option>
+
+            {memberCohortOptions.map((cohort) => (
+              <option key={cohort} value={cohort}>
+                Letting {cohort}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button
+          className="member-filter-reset"
+          type="button"
+          onClick={() => {
+            setMemberSearch('');
+            setMemberStatusFilter('all');
+            setMemberCohortFilter('all');
+          }}
+        >
+          Reset Filter
+        </button>
+      </div>
+    </section>
+
     <section className="card-grid">
-      {allMembers.length ? allMembers.map((member) => (
+      {filteredMembers.length ? filteredMembers.map((member) => (
         <PixelCard className="member-card" key={member.uid}>
           <h3>{member.avatar} {member.name}</h3>
           <p>{member.nim} · Letting {member.cohort || '-'}</p>
@@ -1101,7 +1220,9 @@ async function handleRejectChallengeSubmission(submission) {
           </div>
         </PixelCard>
       )) : (
-        <PixelCard>Belum ada anggota.</PixelCard>
+        <PixelCard>
+          Tidak ada anggota yang cocok dengan filter.
+        </PixelCard>
       )}
     </section>
 
