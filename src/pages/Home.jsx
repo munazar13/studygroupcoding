@@ -5,7 +5,7 @@ import StatCard from '../components/StatCard';
 import LoadingState from '../components/LoadingState';
 import { loadPublicData } from '../services/dataApi';
 import { useAuth } from '../context/AuthContext';
-
+import AnnouncementsPanel from '../components/AnnouncementsPanel';
 import SetupNotice from '../components/SetupNotice';
 
 function isChallengeActive(challenge) {
@@ -126,6 +126,8 @@ export default function Home() {
           <small>Gerbang awal untuk calon programmer.</small>
         </PixelCard>
       </section>
+
+      <AnnouncementsPanel limit={3} />
 
       <section className="stat-grid">
         <StatCard icon="🗺️" value="32" label="Stage Belajar" />
