@@ -444,6 +444,49 @@ courseId: String(selectedCourse.id || '')
     await reload();
   }
 
+  function applyMasterRewardToCourse(type, rewardId) {
+  const reward = masterRewards.find((item) => String(item.id) === String(rewardId));
+
+  if (!reward) return;
+
+  if (type === 'badge') {
+    setCourseForm((current) => ({
+      ...current,
+      badgeRewardEnabled: true,
+      badgeId: reward.id || '',
+      badgeName: reward.name || reward.title || '',
+      badgeDescription: reward.description || '',
+      badgeIcon: reward.icon || '🏅',
+      badgeRarity: reward.rarity || 'common'
+    }));
+  }
+
+  if (type === 'title') {
+    setCourseForm((current) => ({
+      ...current,
+      titleRewardEnabled: true,
+      titleRewardId: reward.id || '',
+      titleRewardName: reward.name || reward.title || '',
+      titleRewardDescription: reward.description || '',
+      titleRewardIcon: reward.icon || '🎖️',
+      titleRewardRarity: reward.rarity || 'common'
+    }));
+  }
+
+  if (type === 'chest') {
+    setCourseForm((current) => ({
+      ...current,
+      hasChestReward: true,
+      chestId: reward.id || '',
+      chestName: reward.name || reward.title || '',
+      chestDescription: reward.description || '',
+      chestIcon: reward.icon || '🎁',
+      chestRarity: reward.rarity || 'common'
+    }));
+  }
+}
+
+
   async function handleRewardSubmit(event) {
   event.preventDefault();
 
@@ -820,6 +863,23 @@ async function handleRejectChallengeSubmission(submission) {
 
       {courseForm.badgeRewardEnabled ? (
         <>
+        <label className="form-field">
+  <span>Pilih Badge dari Reward Master</span>
+  <select
+    value={courseForm.badgeId}
+    onChange={(e) => applyMasterRewardToCourse('badge', e.target.value)}
+  >
+    <option value="">Pilih badge master</option>
+
+    {badgeRewards.map((reward) => (
+      <option key={reward.id} value={reward.id}>
+        {reward.icon || '🏅'} {reward.name || reward.title} · {getRarityLabel(reward.rarity)}
+      </option>
+    ))}
+  </select>
+  <small>Kalau dipilih, nama, deskripsi, icon, dan rarity badge otomatis terisi.</small>
+</label>
+
           <label className="form-field">
             <span>Nama Badge</span>
             <input
@@ -888,6 +948,23 @@ async function handleRejectChallengeSubmission(submission) {
 
       {courseForm.titleRewardEnabled ? (
         <>
+        <label className="form-field">
+  <span>Pilih Title dari Reward Master</span>
+  <select
+    value={courseForm.titleRewardId}
+    onChange={(e) => applyMasterRewardToCourse('title', e.target.value)}
+  >
+    <option value="">Pilih title master</option>
+
+    {titleRewards.map((reward) => (
+      <option key={reward.id} value={reward.id}>
+        {reward.icon || '🎖️'} {reward.name || reward.title} · {getRarityLabel(reward.rarity)}
+      </option>
+    ))}
+  </select>
+  <small>Kalau dipilih, nama, deskripsi, icon, dan rarity title otomatis terisi.</small>
+</label>
+
           <label className="form-field">
             <span>Nama Title</span>
             <input
@@ -953,7 +1030,25 @@ async function handleRejectChallengeSubmission(submission) {
       </label>
 
       {courseForm.hasChestReward ? (
-        <div className="form-row">
+  <>
+    <label className="form-field">
+      <span>Pilih Chest dari Reward Master</span>
+      <select
+        value={courseForm.chestId}
+        onChange={(e) => applyMasterRewardToCourse('chest', e.target.value)}
+      >
+        <option value="">Pilih chest master</option>
+
+        {chestRewards.map((reward) => (
+          <option key={reward.id} value={reward.id}>
+            {reward.icon || '🎁'} {reward.name || reward.title} · {getRarityLabel(reward.rarity)}
+          </option>
+        ))}
+      </select>
+      <small>Kalau dipilih, nama, deskripsi, icon, dan rarity chest otomatis terisi.</small>
+    </label>
+
+    <div className="form-row">
           <label className="form-field">
             <span>Nama Chest</span>
             <input
@@ -977,7 +1072,8 @@ async function handleRejectChallengeSubmission(submission) {
             </select>
           </label>
         </div>
-      ) : null}
+  </>
+) : null}
     </div>
 
     <label className="check-line">
