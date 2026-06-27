@@ -490,17 +490,9 @@ function appendToQuestionField(fieldName, snippet) {
   }
 }
 
-  async function handleGrantRewardToSelectedMember(event) {
-  event.preventDefault();
+ 
 
-  if (!selectedMember) return;
-
-  const reward = masterRewards.find((item) => {
-    return String(item.id) === String});
-
-  const [memberRewardGrantId, setMemberRewardGrantId] = useState('');
-
-    async function handleGrantRewardToSelectedMember(event) {
+   async function handleGrantRewardToSelectedMember(event) {
   event.preventDefault();
 
   if (!selectedMember) return;
