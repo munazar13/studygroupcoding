@@ -486,6 +486,22 @@ courseId: String(selectedCourse.id || '')
   }
 }
 
+  function applyMasterRewardToChallenge(type, rewardId) {
+  const reward = masterRewards.find((item) => String(item.id) === String(rewardId));
+
+  if (!reward) return;
+
+  setChallengeForm((current) => ({
+    ...current,
+    rewardType: type,
+    rewardId: reward.id || '',
+    rewardName: reward.name || reward.title || '',
+    rewardDescription: reward.description || '',
+    rewardIcon: reward.icon || (type === 'title' ? '🎖️' : type === 'chest' ? '🎁' : '🏅'),
+    rewardRarity: reward.rarity || 'common'
+  }));
+}
+
 
   async function handleRewardSubmit(event) {
   event.preventDefault();
@@ -1676,6 +1692,22 @@ async function handleRejectChallengeSubmission(submission) {
 
           {challengeForm.rewardType === 'badge' ? (
             <>
+            <label className="form-field">
+            <span>Pilih Badge dari Reward Master</span>
+            <select
+              value={challengeForm.rewardId}
+              onChange={(e) => applyMasterRewardToChallenge('badge', e.target.value)}
+            >
+              <option value="">Pilih badge master</option>
+
+              {badgeRewards.map((reward) => (
+                <option key={reward.id} value={reward.id}>
+                  {reward.icon || '🏅'} {reward.name || reward.title} · {getRarityLabel(reward.rarity)}
+                </option>
+              ))}
+            </select>
+            <small>Kalau dipilih, nama, ID, deskripsi, icon, dan rarity badge otomatis terisi.</small>
+          </label>
               <label className="form-field">
                 <span>Nama Badge</span>
                 <input
@@ -1758,6 +1790,22 @@ async function handleRejectChallengeSubmission(submission) {
 
           {challengeForm.rewardType === 'title' ? (
             <>
+            <label className="form-field">
+            <span>Pilih Title dari Reward Master</span>
+            <select
+              value={challengeForm.rewardId}
+              onChange={(e) => applyMasterRewardToChallenge('title', e.target.value)}
+            >
+              <option value="">Pilih title master</option>
+
+              {titleRewards.map((reward) => (
+                <option key={reward.id} value={reward.id}>
+                  {reward.icon || '🎖️'} {reward.name || reward.title} · {getRarityLabel(reward.rarity)}
+                </option>
+              ))}
+            </select>
+            <small>Kalau dipilih, nama, ID, deskripsi, icon, dan rarity title otomatis terisi.</small>
+          </label>
               <label className="form-field">
                 <span>Nama Title</span>
                 <input
@@ -1840,6 +1888,22 @@ async function handleRejectChallengeSubmission(submission) {
 
           {challengeForm.rewardType === 'chest' ? (
             <>
+            <label className="form-field">
+  <span>Pilih Chest dari Reward Master</span>
+  <select
+    value={challengeForm.rewardId}
+    onChange={(e) => applyMasterRewardToChallenge('chest', e.target.value)}
+  >
+    <option value="">Pilih chest master</option>
+
+    {chestRewards.map((reward) => (
+      <option key={reward.id} value={reward.id}>
+        {reward.icon || '🎁'} {reward.name || reward.title} · {getRarityLabel(reward.rarity)}
+      </option>
+    ))}
+  </select>
+  <small>Kalau dipilih, nama, ID, deskripsi, icon, dan rarity chest otomatis terisi.</small>
+</label>
               <label className="form-field">
                 <span>Nama Chest</span>
                 <input
