@@ -2114,3 +2114,54 @@ flex-direction: column;
   color: #ffffff !important;
   border: 2px solid #7f1d1d !important;
 }
+
+.admin-reward-line,
+.admin-reward-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0;
+}
+
+.admin-rarity-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1.2;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.admin-rarity-pill.rarity-common {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 2px solid #d1d5db !important;
+}
+
+.admin-rarity-pill.rarity-uncommon {
+  background: #e5e7eb !important;
+  color: #111827 !important;
+  border: 2px solid #6b7280 !important;
+}
+
+.admin-rarity-pill.rarity-rare {
+  background: #172554 !important;
+  color: #ffffff !important;
+  border: 2px solid #60a5fa !important;
+}
+
+.admin-rarity-pill.rarity-epic {
+  background: #facc15 !important;
+  color: #422006 !important;
+  border: 2px solid #ca8a04 !important;
+}
+
+.admin-rarity-pill.rarity-mythic {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border: 2px solid #7f1d1d !important;
+}

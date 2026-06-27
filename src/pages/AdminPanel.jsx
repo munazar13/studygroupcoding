@@ -27,7 +27,7 @@ import {
   deleteReward
 } from '../services/dataApi';
 import { downloadTextFile } from '../utils/download';
-import { RARITY_LIST, getRarityLabel } from '../utils/rarity';
+import { RARITY_LIST, getRarityClassName, getRarityLabel } from '../utils/rarity';
 const tabs = [
 { id: 'overview', label: 'Ringkasan' },
 { id: 'members', label: 'Anggota' },
@@ -2029,11 +2029,19 @@ async function handleRejectChallengeSubmission(submission) {
           (challengeData?.challenges || []).map((challenge) => (
             <PixelCard key={challenge.id}>
               <h3>{challenge.title}</h3>
-              <p>
-                Reward: {challenge.rewardType}
-                {challenge.rewardName ? ` · ${challenge.rewardName}` : ''}
-                {challenge.rewardRarity ? ` · ${challenge.rewardRarity}` : ''}
-              </p>
+              <div className="admin-reward-line">
+                <span>Reward: {challenge.rewardType}</span>
+
+                {challenge.rewardName ? (
+                  <strong>{challenge.rewardIcon || '🎁'} {challenge.rewardName}</strong>
+                ) : null}
+
+                {challenge.rewardRarity ? (
+                  <span className={`admin-rarity-pill ${getRarityClassName(challenge.rewardRarity)}`}>
+                    {getRarityLabel(challenge.rewardRarity)}
+                  </span>
+                ) : null}
+              </div>
               <p>{challenge.description}</p>
 
               <div className="member-actions">
@@ -2296,7 +2304,13 @@ async function handleRejectChallengeSubmission(submission) {
           <div className="editor-card" key={reward.id}>
             <div>
               <strong>{reward.icon || '🏅'} {reward.name || reward.title}</strong>
-              <p>{getRarityLabel(reward.rarity)} · {reward.published !== false ? 'Published' : 'Draft'}</p>
+              <div className="admin-reward-meta">
+                <span className={`admin-rarity-pill ${getRarityClassName(reward.rarity)}`}>
+                  {getRarityLabel(reward.rarity)}
+                </span>
+
+                <span>{reward.published !== false ? 'Published' : 'Draft'}</span>
+              </div>
               <small>{reward.description || 'Tanpa deskripsi.'}</small>
             </div>
 
@@ -2329,7 +2343,13 @@ async function handleRejectChallengeSubmission(submission) {
           <div className="editor-card" key={reward.id}>
             <div>
               <strong>{reward.icon || '🎖️'} {reward.name || reward.title}</strong>
-              <p>{getRarityLabel(reward.rarity)} · {reward.published !== false ? 'Published' : 'Draft'}</p>
+              <div className="admin-reward-meta">
+                <span className={`admin-rarity-pill ${getRarityClassName(reward.rarity)}`}>
+                  {getRarityLabel(reward.rarity)}
+                </span>
+
+                <span>{reward.published !== false ? 'Published' : 'Draft'}</span>
+              </div>
               <small>{reward.description || 'Tanpa deskripsi.'}</small>
             </div>
 
@@ -2362,7 +2382,13 @@ async function handleRejectChallengeSubmission(submission) {
           <div className="editor-card" key={reward.id}>
             <div>
               <strong>{reward.icon || '🎁'} {reward.name || reward.title}</strong>
-              <p>{getRarityLabel(reward.rarity)} · {reward.published !== false ? 'Published' : 'Draft'}</p>
+              <div className="admin-reward-meta">
+                <span className={`admin-rarity-pill ${getRarityClassName(reward.rarity)}`}>
+                  {getRarityLabel(reward.rarity)}
+                </span>
+
+                <span>{reward.published !== false ? 'Published' : 'Draft'}</span>
+              </div>
               <small>{reward.description || 'Tanpa deskripsi.'}</small>
             </div>
 
