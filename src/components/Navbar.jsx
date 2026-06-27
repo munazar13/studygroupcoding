@@ -30,6 +30,8 @@ const navigate = useNavigate();
 
 const navRef = useRef(null);
 const measureRef = useRef(null);
+const topMoreRef = useRef(null);
+const bottomMoreRef = useRef(null);
 
 const [visibleCount, setVisibleCount] = useState(99);
 const [isMobile, setIsMobile] = useState(false);
@@ -94,6 +96,34 @@ return [
 : [])
 ];
 }, [isApproved, isAdmin, currentMember]);
+
+useEffect(() => {
+  function handleClickOutside(event) {
+    if (
+      topMoreRef.current &&
+      topMoreRef.current.open &&
+      !topMoreRef.current.contains(event.target)
+    ) {
+      topMoreRef.current.removeAttribute('open');
+    }
+
+    if (
+      bottomMoreRef.current &&
+      bottomMoreRef.current.open &&
+      !bottomMoreRef.current.contains(event.target)
+    ) {
+      bottomMoreRef.current.removeAttribute('open');
+    }
+  }
+
+  document.addEventListener('mousedown', handleClickOutside);
+  document.addEventListener('touchstart', handleClickOutside);
+
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+    document.removeEventListener('touchstart', handleClickOutside);
+  };
+}, []);
 
 useEffect(() => {
 function updateVisibleLinks() {
@@ -167,14 +197,18 @@ return (
       ))}
 
       {hiddenLinks.length > 0 ? (
-        <details className="nav-more">
+        <details className="nav-more" ref={topMoreRef}>
           <summary>Lainnya</summary>
 
           <div className="nav-more-menu">
             {hiddenLinks.map((link) => (
-              <NavLink key={link.to} to={link.to}>
-                {link.label}
-              </NavLink>
+              <NavLink
+              key={link.to}
+              to={link.to}
+              onClick={() => topMoreRef.current?.removeAttribute('open')}
+            >
+              {link.label}
+            </NavLink>
             ))}
           </div>
         </details>
@@ -218,7 +252,7 @@ return (
       </NavLink>
     ))}
 
-    <details className="bottom-more">
+    <details className="bottom-more" ref={bottomMoreRef}>
       <summary>
         <span className="bottom-nav-icon">☰</span>
         <small>Menu</small>
@@ -226,14 +260,24 @@ return (
 
       <div className="bottom-more-menu">
         {mobileMenuLinks.map((link) => (
-          <NavLink key={link.to} to={link.to}>
-            <span>{link.icon}</span>
-            <small>{link.label}</small>
-          </NavLink>
+          <NavLink
+          key={link.to}
+          to={link.to}
+          onClick={() => bottomMoreRef.current?.removeAttribute('open')}
+        >
+          <span>{link.icon}</span>
+          <small>{link.label}</small>
+        </NavLink>
         ))}
 
         {currentMember ? (
-          <button type="button" onClick={handleLogout}>
+          <button
+            type="button"
+            onClick={() => {
+              bottomMoreRef.current?.removeAttribute('open');
+              handleLogout();
+            }}
+          >
             <span>🚪</span>
             <small>Keluar</small>
           </button>
