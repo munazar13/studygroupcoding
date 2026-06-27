@@ -327,6 +327,39 @@ courseId: String(selectedCourse.id || '')
 }));
 }, [activeTab, selectedCourse]);
 
+function createCodeSnippet(language = 'php') {
+  const fence = String.fromCharCode(96).repeat(3);
+
+  return `${fence}${language}
+
+${fence}`;
+}
+
+function createImageSnippet() {
+  return '![Judul gambar](images/materials/nama-file.png)';
+}
+
+function appendToSectionContent(snippet) {
+  setSectionForm((current) => {
+    const oldContent = String(current.content || '').trimEnd();
+
+    return {
+      ...current,
+      content: oldContent ? `${oldContent}\n\n${snippet}` : snippet
+    };
+  });
+}
+
+function appendToQuestionField(fieldName, snippet) {
+  setQuestionForm((current) => {
+    const oldContent = String(current[fieldName] || '').trimEnd();
+
+    return {
+      ...current,
+      [fieldName]: oldContent ? `${oldContent}\n\n${snippet}` : snippet
+    };
+  });
+}
 
   async function handleImportSystem() {
     try {
@@ -1146,6 +1179,43 @@ async function handleRejectChallengeSubmission(submission) {
       onChange={(e) => setSectionForm({ ...sectionForm, content: e.target.value })}
     />
 
+    <div className="admin-insert-toolbar">
+      <button
+        type="button"
+        onClick={() => appendToSectionContent(createCodeSnippet('php'))}
+      >
+        + Kode PHP
+        </button>
+
+        <button
+          type="button"
+          onClick={() => appendToSectionContent(createCodeSnippet('html'))}
+        >
+          + Kode HTML
+        </button>
+
+        <button
+          type="button"
+          onClick={() => appendToSectionContent(createCodeSnippet('css'))}
+        >
+          + Kode CSS
+        </button>
+
+        <button
+          type="button"
+          onClick={() => appendToSectionContent(createCodeSnippet('js'))}
+        >
+          + Kode JS
+        </button>
+
+        <button
+          type="button"
+          onClick={() => appendToSectionContent(createImageSnippet())}
+        >
+          + Gambar
+        </button>
+      </div>
+
     <div className="admin-preview-box">
       <div className="section-title-row">
         <h4>Preview Materi</h4>
@@ -1261,6 +1331,36 @@ async function handleRejectChallengeSubmission(submission) {
       onChange={(e) => setQuestionForm({ ...questionForm, question: e.target.value })}
     />
 
+    <div className="admin-insert-toolbar">
+      <button
+        type="button"
+        onClick={() => appendToQuestionField('question', createCodeSnippet('php'))}
+      >
+        + Kode PHP
+      </button>
+
+      <button
+        type="button"
+        onClick={() => appendToQuestionField('question', createCodeSnippet('html'))}
+      >
+        + Kode HTML
+      </button>
+
+      <button
+        type="button"
+        onClick={() => appendToQuestionField('question', createCodeSnippet('js'))}
+      >
+        + Kode JS
+      </button>
+
+      <button
+        type="button"
+        onClick={() => appendToQuestionField('question', createImageSnippet())}
+      >
+        + Gambar
+      </button>
+    </div>
+
     <div className="admin-preview-box">
       <div className="section-title-row">
         <h4>Preview Pertanyaan</h4>
@@ -1279,6 +1379,13 @@ async function handleRejectChallengeSubmission(submission) {
         value={questionForm.optionA}
         onChange={(e) => setQuestionForm({ ...questionForm, optionA: e.target.value })}
       />
+      <button
+        className="mini-insert-button"
+        type="button"
+        onClick={() => appendToQuestionField('optionA', createCodeSnippet('txt'))}
+      >
+        + Kode ke A
+      </button>
 
       <textarea
         required
@@ -1286,6 +1393,13 @@ async function handleRejectChallengeSubmission(submission) {
         value={questionForm.optionB}
         onChange={(e) => setQuestionForm({ ...questionForm, optionB: e.target.value })}
       />
+      <button
+        className="mini-insert-button"
+        type="button"
+        onClick={() => appendToQuestionField('optionB', createCodeSnippet('txt'))}
+      >
+        + Kode ke B
+      </button>
     </div>
 
     <div className="form-row">
@@ -1295,6 +1409,13 @@ async function handleRejectChallengeSubmission(submission) {
         value={questionForm.optionC}
         onChange={(e) => setQuestionForm({ ...questionForm, optionC: e.target.value })}
       />
+      <button
+        className="mini-insert-button"
+        type="button"
+        onClick={() => appendToQuestionField('optionC', createCodeSnippet('txt'))}
+      >
+        + Kode ke C
+      </button>
 
       <textarea
         required
@@ -1302,6 +1423,13 @@ async function handleRejectChallengeSubmission(submission) {
         value={questionForm.optionD}
         onChange={(e) => setQuestionForm({ ...questionForm, optionD: e.target.value })}
       />
+      <button
+        className="mini-insert-button"
+        type="button"
+        onClick={() => appendToQuestionField('optionD', createCodeSnippet('txt'))}
+      >
+        + Kode ke D
+      </button>
     </div>
 
     <div className="admin-preview-box">
@@ -1357,6 +1485,36 @@ async function handleRejectChallengeSubmission(submission) {
       value={questionForm.explanation}
       onChange={(e) => setQuestionForm({ ...questionForm, explanation: e.target.value })}
     />
+
+    <div className="admin-insert-toolbar">
+      <button
+        type="button"
+        onClick={() => appendToQuestionField('explanation', createCodeSnippet('php'))}
+      >
+        + Kode PHP
+      </button>
+
+      <button
+        type="button"
+        onClick={() => appendToQuestionField('explanation', createCodeSnippet('html'))}
+      >
+        + Kode HTML
+      </button>
+
+      <button
+        type="button"
+        onClick={() => appendToQuestionField('explanation', createCodeSnippet('js'))}
+      >
+        + Kode JS
+      </button>
+
+      <button
+        type="button"
+        onClick={() => appendToQuestionField('explanation', createImageSnippet())}
+      >
+        + Gambar
+      </button>
+    </div>
 
     <div className="admin-preview-box">
       <div className="section-title-row">

@@ -2199,3 +2199,32 @@ flex-direction: column;
 .admin-preview-image {
   margin: 0.5rem 0;
 }
+
+.admin-insert-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.45rem 0 0.75rem;
+}
+
+.admin-insert-toolbar button,
+.mini-insert-button {
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.admin-insert-toolbar button:hover,
+.mini-insert-button:hover {
+  transform: translateY(-1px);
+}
+
+.mini-insert-button {
+  margin: 0.35rem 0 0.75rem;
+}
