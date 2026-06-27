@@ -41,6 +41,12 @@ function getPriorityLabel(priority) {
   return 'Info';
 }
 
+function getPriorityIcon(priority) {
+  if (priority === 'urgent') return '🚨';
+  if (priority === 'high') return '📌';
+  return '📢';
+}
+
 export default function AnnouncementsPanel({ limit = 3 }) {
   const auth = useAuth();
   const currentMember = auth?.currentMember || auth?.member || null;
@@ -85,67 +91,58 @@ export default function AnnouncementsPanel({ limit = 3 }) {
       .slice(0, limit);
   }, [announcements, currentMember, limit]);
 
-  if (loading) {
-    return null;
-  }
-
-  if (!visibleAnnouncements.length) {
-    return null;
-  }
+  if (loading) return null;
+  if (!visibleAnnouncements.length) return null;
 
   return (
-  <section className="announcement-panel">
-    <div className="announcement-panel-head">
-      <div>
-        <p className="eyebrow">Pengumuman</p>
-        <h2>Info Terbaru</h2>
+    <section className="home-announcement-panel">
+      <div className="home-announcement-head">
+        <div>
+          <p className="eyebrow">Pengumuman</p>
+          <h2>Info Terbaru</h2>
+        </div>
+
+        <span className="home-announcement-count">
+          {visibleAnnouncements.length} info
+        </span>
       </div>
 
-      <span className="announcement-count">
-        {visibleAnnouncements.length} info
-      </span>
-    </div>
+      <div className="home-announcement-list">
+        {visibleAnnouncements.map((announcement) => {
+          const priority = String(announcement.priority || 'normal').toLowerCase();
+          const showPriority = priority === 'high' || priority === 'urgent';
 
-    <div className="announcement-list">
-      {visibleAnnouncements.map((announcement) => {
-        const priority = String(announcement.priority || 'normal').toLowerCase();
-        const showPriority = priority === 'high' || priority === 'urgent';
-
-        return (
-          <PixelCard
-            className={`announcement-card priority-${priority}`}
-            key={announcement.id}
-          >
-            <div className="announcement-icon">
-              {priority === 'urgent' ? '🚨' : priority === 'high' ? '📌' : '📢'}
-            </div>
-
-            <div className="announcement-body">
-              <div className="announcement-card-head">
-                <span className="announcement-category">
-                  {announcement.category || 'Info'}
-                </span>
-
-                {showPriority ? (
-                  <span className={`announcement-priority ${priority}`}>
-                    {getPriorityLabel(priority)}
-                  </span>
-                ) : null}
-
-                {announcement.pinned ? (
-                  <span className="announcement-pin">
-                    Pinned
-                  </span>
-                ) : null}
+          return (
+            <PixelCard
+              className={`home-announcement-card priority-${priority}`}
+              key={announcement.id}
+            >
+              <div className="home-announcement-icon">
+                {getPriorityIcon(priority)}
               </div>
 
-              <h3>{announcement.title}</h3>
-              <p>{announcement.message}</p>
-            </div>
-          </PixelCard>
-        );
-      })}
-    </div>
-  </section>
-);
+              <div className="home-announcement-content">
+                <div className="home-announcement-badges">
+                  <span>{announcement.category || 'Info'}</span>
+
+                  {showPriority ? (
+                    <span className={`priority-${priority}`}>
+                      {getPriorityLabel(priority)}
+                    </span>
+                  ) : null}
+
+                  {announcement.pinned ? (
+                    <span>Pinned</span>
+                  ) : null}
+                </div>
+
+                <h3>{announcement.title}</h3>
+                <p>{announcement.message}</p>
+              </div>
+            </PixelCard>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
