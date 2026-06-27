@@ -1109,73 +1109,57 @@ async function handleRejectChallengeSubmission(submission) {
       </div>
 
       <div className="member-filter-grid">
-        <label className="form-field">
-          <span>Cari Nama / NIM / Letting</span>
-          <input
-            type="text"
-            placeholder="Contoh: Syamil, 230..., 2024"
-            value={memberSearch}
-            onChange={(e) => setMemberSearch(e.target.value)}
-          />
-        </label>
+  <label className="form-field">
+    <span>Cari Nama / NIM / Letting</span>
+    <input
+      type="text"
+      placeholder="Contoh: Syamil, 230..., 2024"
+      value={memberSearch}
+      onChange={(e) => setMemberSearch(e.target.value)}
+    />
+  </label>
 
-        <label className="form-field">
-          <span>Status</span>
-          <select
-            value={memberStatusFilter}
-            onChange={(e) => setMemberStatusFilter(e.target.value)}
-          >
-            <option value="all">Semua Status</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </label>
+  <label className="form-field">
+    <span>Status</span>
+    <select
+      value={memberStatusFilter}
+      onChange={(e) => setMemberStatusFilter(e.target.value)}
+    >
+      <option value="all">Semua Status</option>
+      <option value="pending">Pending</option>
+      <option value="approved">Approved</option>
+      <option value="rejected">Rejected</option>
+    </select>
+  </label>
 
-        <label className="form-field">
-          <span>Letting</span>
-          <select
-            value={ />
-        </label>
+  <label className="form-field">
+    <span>Letting</span>
+    <select
+      value={memberCohortFilter}
+      onChange={(e) => setMemberCohortFilter(e.target.value)}
+    >
+      <option value="all">Semua Letting</option>
 
-        <label className="form-field">
-          <span>Status</span>
-          <select
-            value={memberStatusFilter}
-            onChange={(e) => setMemberStatusFilter(e.target.value)}
-          >
-            <option value="all">Semua Status</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </label>
+      {memberCohortOptions.map((cohort) => (
+        <option key={cohort} value={cohort}>
+          Letting {cohort}
+        </option>
+      ))}
+    </select>
+  </label>
 
-        <label className="memberCohortFilter}
-            onChange={(e) => setMemberCohortFilter(e.target.value)}
-          >
-            <option value="all">Semua Letting</option>
-
-            {memberCohortOptions.map((cohort) => (
-              <option key={cohort} value={cohort}>
-                Letting {cohort}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <button
-          className="member-filter-reset"
-          type="button"
-          onClick={() => {
-            setMemberSearch('');
-            setMemberStatusFilter('all');
-            setMemberCohortFilter('all');
-          }}
-        >
-          Reset Filter
-        </button>
-      </div>
+  <button
+    className="member-filter-reset"
+    type="button"
+    onClick={() => {
+      setMemberSearch('');
+      setMemberStatusFilter('all');
+      setMemberCohortFilter('all');
+    }}
+  >
+    Reset Filter
+  </button>
+</div>
     </section>
 
     <section className="card-grid">
