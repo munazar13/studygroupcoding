@@ -1073,6 +1073,30 @@ export async function cleanMemberData(member) {
   return payload;
 }
 
+export async function updateMemberAdminStats(member, stats = {}) {
+  const uid = getMemberUid(member);
+
+  const level = Math.max(1, Number(stats.level) || 1);
+  const xp = Math.max(0, Number(stats.xp) || 0);
+  const xpToNextLevel = Math.max(100, Number(stats.xpToNextLevel) || 100);
+  const totalXp = Math.max(0, Number(stats.totalXp) || 0);
+  const coins = Math.max(0, Number(stats.coins) || 0);
+
+  const payload = {
+    level,
+    xp,
+    xpToNextLevel,
+    totalXp,
+    coins,
+    updatedAt: new Date().toISOString()
+  };
+
+  await updateMember(uid, payload);
+  await createActivity(`Stat ${member.name || uid} diperbarui admin.`, 'member');
+
+  return payload;
+}
+
 export async function removeRecord(collectionName, id) {
   await deleteDocument(collectionName, id);
 }

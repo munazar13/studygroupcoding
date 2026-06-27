@@ -22,6 +22,7 @@ import {
   resetMemberProgress,
   resetMemberRewards,
   setMemberStatus,
+  updateMemberAdminStats,
   upsertChallenge,
   upsertCourse,
   upsertCourseSection,
@@ -220,6 +221,13 @@ export default function AdminPanel() {
   const [rewardForm, setRewardForm] = useState(emptyReward);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState('');
+  const [memberEditForm, setMemberEditForm] = useState({
+  level: 1,
+  xp: 0,
+  xpToNextLevel: 100,
+  totalXp: 0,
+  coins: 0
+});
 
   async function reload() {
   setLoading(true);
@@ -303,6 +311,18 @@ const selectedMember = useMemo(() => {
     return String(member.uid || member.id || '') === String(selectedMemberId);
   }) || null;
 }, [allMembers, selectedMemberId]);
+
+useEffect(() => {
+  if (!selectedMember) return;
+
+  setMemberEditForm({
+    level: Number(selectedMember.level || 1),
+    xp: Number(selectedMember.xp || 0),
+    xpToNextLevel: Number(selectedMember.xpToNextLevel || 100),
+    totalXp: Number(selectedMember.totalXp || 0),
+    coins: Number(selectedMember.coins || 0)
+  });
+}, [selectedMember]);
 
 function formatAdminDate(value) {
   if (!value) return '-';
@@ -465,6 +485,29 @@ function appendToQuestionField(fieldName, snippet) {
     await refreshMember();
   } catch (error) {
     showToast(error.message || 'Gagal memproses anggota.', 'error');
+  }
+}
+
+async function handleUpdateSelectedMemberStats(event) {
+  event.preventDefault();
+
+  if (!selectedMember) return;
+
+  const confirmed = window.confirm(
+    `Simpan perubahan stat untuk "${selectedMember.name}"?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await updateMemberAdminStats(selectedMember, memberEditForm);
+
+    showToast('Stat member berhasil diperbarui.');
+    await reload();
+    await refreshMember();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal memperbarui stat member.', 'error');
   }
 }
 
@@ -1001,6 +1044,114 @@ async function handleRejectChallengeSubmission(submission) {
               <span>Challenge Selesai</span>
             </div>
           </div>
+
+
+          <form className="member-admin-edit-form" onSubmit={handleUpdateSelectedMemberStats}>
+  <div>
+    <p className="eyebrow">Edit Manual Admin</p>
+    <h3>Koreksi Level, XP, dan Koin</h3>
+    <p>Gunakan kalau XP/koin/level member perlu dikoreksi tanpa reset total.</p>
+  </div>
+
+  <div className="member-admin-edit-grid">
+    <label className="form-field">
+      <span>Level</span>
+      <input
+        type="number"
+        min="1"
+        value={memberEditForm.level}
+        onChange={(e) =>
+          setMemberEditForm({
+            ...memberEditForm,
+            level: e.target.value
+          })
+        }
+      />
+    </label>
+
+    <label className="form-field">
+      <span>XP Sekarang</span>
+      <input
+        type="number"
+        min="0"
+        value={memberEditForm.xp}
+        onChange={(e) =>
+          setMemberEditForm({
+            ...memberEditForm,
+            xp: e.target.value
+          })
+        }
+      />
+    </label>
+
+    <label className="form-field">
+      <span>XP ke Level Berikutnya</span>
+      <input
+        type="number"
+        min="100"
+        value={memberEditForm.xpToNextLevel}
+        onChange={(e) =>
+          setMemberEditForm({
+            ...memberEditForm,
+            xpToNextLevel: e.target.value
+          })
+        }
+      />
+    </label>
+
+    <label className="form-field">
+      <span>Total XP</span>
+      <input
+        type="number"
+        min="0"
+        value={memberEditForm.totalXp}
+        onChange={(e) =>
+          setMemberEditForm({
+            ...memberEditForm,
+            totalXp: e.target.value
+          })
+        }
+      />
+    </label>
+
+    <label className="form-field">
+      <span>Koin</span>
+      <input
+        type="number"
+        min="0"
+        value={memberEditForm.coins}
+        onChange={(e) =>
+          setMemberEditForm({
+            ...memberEditForm,
+            coins: e.target.value
+          })
+        }
+      />
+    </label>
+  </div>
+
+  <div className="member-actions">
+    <PixelButton type="submit">
+      Simpan Stat Member
+    </PixelButton>
+
+    <PixelButton
+      type="button"
+      variant="secondary"
+      onClick={() =>
+        setMemberEditForm({
+          level: Number(selectedMember.level || 1),
+          xp: Number(selectedMember.xp || 0),
+          xpToNextLevel: Number(selectedMember.xpToNextLevel || 100),
+          totalXp: Number(selectedMember.totalXp || 0),
+          coins: Number(selectedMember.coins || 0)
+        })
+      }
+    >
+      Batalkan Perubahan
+    </PixelButton>
+  </div>
+</form>
 
           <div className="member-detail-grid">
             <div className="member-detail-box">
