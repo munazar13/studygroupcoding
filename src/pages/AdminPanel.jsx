@@ -22,6 +22,7 @@ import {
   resetMemberEconomy,
   resetMemberProgress,
   resetMemberRewards,
+  restoreBackupData,
   setMemberStatus,
   updateMemberAdminStats,
   upsertChallenge,
@@ -935,7 +936,33 @@ async function handleRejectChallengeSubmission(submission) {
     downloadTextFile('study-group-coding-firestore-backup.json', content);
     showToast('Backup berhasil dibuat.');
   }
+  async function handleRestoreBackup(event) {
+  const file = event.target.files?.[0];
 
+  if (!file) return;
+
+  const confirmed = window.confirm(
+    'Restore backup JSON?\n\nData dengan ID yang sama akan ditimpa oleh isi backup. Pastikan file backup benar.'
+  );
+
+  if (!confirmed) {
+    event.target.value = '';
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const count = await restoreBackupData(text);
+
+    showToast(`Restore berhasil. ${count} dokumen diproses.`);
+    await reload();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Restore backup gagal.', 'error');
+  } finally {
+    event.target.value = '';
+  }
+}
   if (loading) {
     return <LoadingState />;
   }
@@ -3340,12 +3367,45 @@ async function handleRejectChallengeSubmission(submission) {
 
 
       {activeTab === 'backup' ? (
-        <PixelCard>
-          <h2>Backup Data</h2>
-          <p>Unduh salinan data Firestore untuk arsip pengurus.</p>
-          <PixelButton onClick={handleExport}>Export Backup JSON</PixelButton>
-        </PixelCard>
-      ) : null}
+  <section className="backup-admin-section">
+    <PixelCard>
+      <h2>Backup Data</h2>
+      <p>
+        Unduh salinan data Firestore untuk arsip pengurus. Lakukan backup sebelum
+        reset data member, edit reward besar-besaran, atau deploy update penting.
+      </p>
+
+      <PixelButton onClick={handleExport}>
+        Export Backup JSON
+      </PixelButton>
+    </PixelCard>
+
+    <PixelCard className="restore-backup-card">
+      <h2>Restore Backup</h2>
+      <p>
+        Gunakan ini hanya kalau data Firestore rusak, terhapus, atau ingin
+        mengembalikan data lama dari file backup.
+      </p>
+
+      <label className="backup-file-picker">
+        <span>Pilih file backup JSON</span>
+        <input
+          type="file"
+          accept="application/json,.json"
+          onChange={handleRestoreBackup}
+        />
+      </label>
+
+      <div className="backup-warning-box">
+        <strong>Perhatian:</strong>
+        <p>
+          Data dengan ID yang sama akan ditimpa. Restore ini tidak menghapus data
+          yang tidak ada di file backup, tapi tetap bisa menimpa data lama.
+        </p>
+      </div>
+    </PixelCard>
+  </section>
+) : null}
     </main>
   );
 }

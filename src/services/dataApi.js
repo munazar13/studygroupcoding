@@ -1206,6 +1206,75 @@ export async function exportAllData() {
     2
   );
 }
+export async function restoreBackupData(backupJson) {
+  let parsedData = backupJson;
+
+  if (typeof backupJson === 'string') {
+    try {
+      parsedData = JSON.parse(backupJson);
+    } catch (error) {
+      throw new Error('File backup bukan JSON yang valid.');
+    }
+  }
+
+  if (!parsedData || typeof parsedData !== 'object') {
+    throw new Error('Isi backup tidak valid.');
+  }
+
+  const allowedCollections = [
+    'members',
+    'courses',
+    'courseSections',
+    'questions',
+    'events',
+    'docs',
+    'projects',
+    'rewards',
+    'ranks',
+    'founders',
+    'challenges',
+    'challengeSubmissions',
+    'activities'
+  ];
+
+  let restoredCount = 0;
+
+  for (const collectionName of allowedCollections) {
+    const collectionData = parsedData[collectionName];
+
+    if (!collectionData) continue;
+
+    const items = Array.isArray(collectionData)
+      ? collectionData
+      : Object.values(collectionData);
+
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+
+      const id = String(
+        item.id ||
+        item.uid ||
+        item.code ||
+        item.slug ||
+        ''
+      ).trim();
+
+      if (!id) continue;
+
+      await setDocument(collectionName, id, {
+        ...item,
+        id: item.id || id,
+        updatedAt: new Date().toISOString()
+      });
+
+      restoredCount += 1;
+    }
+  }
+
+  await createActivity(`Backup berhasil direstore. ${restoredCount} dokumen diproses.`, 'backup');
+
+  return restoredCount;
+}
 
 export async function createLog(text, type = 'system') {
   return createActivity(text, type);
