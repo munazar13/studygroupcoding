@@ -2775,7 +2775,7 @@ button:disabled {
   margin-bottom: 0.45rem;
 }
 
-.admin-announcement-badges span {
+/* .admin-announcement-badges span {
   display: inline-flex !important;
   width: fit-content !important;
   height: auto !important;
@@ -2796,7 +2796,7 @@ button:disabled {
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase; */
-}
+/* }  */
 
 .admin-announcement-card h3 {
   margin: 0 !important;
