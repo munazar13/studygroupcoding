@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   approveChallengeSubmission,
   rejectChallengeSubmission,
+  cleanMemberData,
   exportAllData,
   importSystemData,
   loadAdminContentData,
@@ -16,6 +17,10 @@ import {
   loadLearningData,
   loadPublicData,
   removeRecord,
+  resetMemberChallenges,
+  resetMemberEconomy,
+  resetMemberProgress,
+  resetMemberRewards,
   setMemberStatus,
   upsertChallenge,
   upsertCourse,
@@ -460,6 +465,106 @@ function appendToQuestionField(fieldName, snippet) {
     await refreshMember();
   } catch (error) {
     showToast(error.message || 'Gagal memproses anggota.', 'error');
+  }
+}
+
+async function handleResetSelectedMemberProgress() {
+  if (!selectedMember) return;
+
+  const confirmed = window.confirm(
+    `Reset progress belajar "${selectedMember.name}"?\n\nLevel, XP, stage selesai, dan riwayat quiz akan direset.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await resetMemberProgress(selectedMember);
+    showToast('Progress member berhasil direset.');
+    await reload();
+    await refreshMember();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal reset progress member.', 'error');
+  }
+}
+
+async function handleResetSelectedMemberRewards() {
+  if (!selectedMember) return;
+
+  const confirmed = window.confirm(
+    `Reset semua reward "${selectedMember.name}"?\n\nBadge, title, chest, dan reward aktif akan dihapus.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await resetMemberRewards(selectedMember);
+    showToast('Reward member berhasil direset.');
+    await reload();
+    await refreshMember();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal reset reward member.', 'error');
+  }
+}
+
+async function handleResetSelectedMemberEconomy() {
+  if (!selectedMember) return;
+
+  const confirmed = window.confirm(
+    `Reset koin "${selectedMember.name}"?\n\nSaldo koin dan riwayat transaksi akan dihapus.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await resetMemberEconomy(selectedMember);
+    showToast('Koin member berhasil direset.');
+    await reload();
+    await refreshMember();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal reset koin member.', 'error');
+  }
+}
+
+async function handleResetSelectedMemberChallenges() {
+  if (!selectedMember) return;
+
+  const confirmed = window.confirm(
+    `Reset data tantangan "${selectedMember.name}"?\n\nSubmission dan challenge selesai akan dikosongkan.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await resetMemberChallenges(selectedMember);
+    showToast('Data tantangan member berhasil direset.');
+    await reload();
+    await refreshMember();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal reset tantangan member.', 'error');
+  }
+}
+
+async function handleCleanSelectedMemberData() {
+  if (!selectedMember) return;
+
+  const confirmed = window.confirm(
+    `Bersihkan data "${selectedMember.name}"?\n\nDuplikat reward/stage akan dibersihkan dan angka negatif diperbaiki.`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await cleanMemberData(selectedMember);
+    showToast('Data member berhasil dibersihkan.');
+    await reload();
+    await refreshMember();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal membersihkan data member.', 'error');
   }
 }
 
@@ -1033,6 +1138,58 @@ async function handleRejectChallengeSubmission(submission) {
               </div>
             </div>
           </div>
+          <div className="member-danger-zone">
+  <div>
+    <p className="eyebrow">Zona Reset Admin</p>
+    <h3>Reset / Bersihkan Data Member</h3>
+    <p>
+      Gunakan hanya kalau data member error, reward dobel, XP salah,
+      atau ingin mengulang progress member tertentu.
+    </p>
+  </div>
+
+  <div className="member-danger-actions">
+    <PixelButton
+      type="button"
+      variant="secondary"
+      onClick={handleCleanSelectedMemberData}
+    >
+      Bersihkan Data
+    </PixelButton>
+
+    <PixelButton
+      type="button"
+      variant="secondary"
+      onClick={handleResetSelectedMemberProgress}
+    >
+      Reset Progress
+    </PixelButton>
+
+    <PixelButton
+      type="button"
+      variant="secondary"
+      onClick={handleResetSelectedMemberRewards}
+    >
+      Reset Reward
+    </PixelButton>
+
+    <PixelButton
+      type="button"
+      variant="secondary"
+      onClick={handleResetSelectedMemberEconomy}
+    >
+      Reset Koin
+    </PixelButton>
+
+    <PixelButton
+      type="button"
+      variant="danger"
+      onClick={handleResetSelectedMemberChallenges}
+    >
+      Reset Tantangan
+    </PixelButton>
+  </div>
+</div>
         </PixelCard>
       </section>
     ) : null}

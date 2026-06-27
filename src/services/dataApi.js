@@ -933,6 +933,146 @@ export async function setMemberStatus(member, status) {
   );
 }
 
+function getMemberUid(member) {
+  const uid = String(member?.uid || member?.id || '').trim();
+
+  if (!uid) {
+    throw new Error('UID member tidak valid.');
+  }
+
+  return uid;
+}
+
+export async function resetMemberProgress(member) {
+  const uid = getMemberUid(member);
+
+  const payload = {
+    level: 1,
+    xp: 0,
+    xpToNextLevel: 100,
+    totalXp: 0,
+    streak: 0,
+    currentStage: 1,
+    completedCourses: [],
+    completedStages: [],
+    passedStages: [],
+    stageProgress: {},
+    courseProgress: {},
+    quizHistory: [],
+    lastStudyDate: '',
+    updatedAt: new Date().toISOString()
+  };
+
+  await updateMember(uid, payload);
+  await createActivity(`Progress belajar ${member.name || uid} direset.`, 'member');
+
+  return payload;
+}
+
+export async function resetMemberRewards(member) {
+  const uid = getMemberUid(member);
+
+  const payload = {
+    badges: [],
+    titles: [],
+    frames: [],
+    avatars: [],
+    ownedBadges: [],
+    ownedTitles: [],
+    ownedFrames: [],
+    ownedAvatars: [],
+    activeBadge: '',
+    activeTitle: '',
+    activeFrame: '',
+    activeAvatar: '',
+    unlockedRewards: [],
+    unopenedChests: [],
+    openedChests: [],
+    chestHistory: [],
+    updatedAt: new Date().toISOString()
+  };
+
+  await updateMember(uid, payload);
+  await createActivity(`Reward ${member.name || uid} direset.`, 'member');
+
+  return payload;
+}
+
+export async function resetMemberEconomy(member) {
+  const uid = getMemberUid(member);
+
+  const payload = {
+    coins: 0,
+    coinTransactions: [],
+    updatedAt: new Date().toISOString()
+  };
+
+  await updateMember(uid, payload);
+  await createActivity(`Koin ${member.name || uid} direset.`, 'member');
+
+  return payload;
+}
+
+export async function resetMemberChallenges(member) {
+  const uid = getMemberUid(member);
+
+  const payload = {
+    challengeSubmissions: [],
+    completedChallenges: [],
+    challengeRewardHistory: [],
+    lastChallengeReward: null,
+    updatedAt: new Date().toISOString()
+  };
+
+  await updateMember(uid, payload);
+  await createActivity(`Data tantangan ${member.name || uid} direset.`, 'member');
+
+  return payload;
+}
+
+export async function cleanMemberData(member) {
+  const uid = getMemberUid(member);
+
+  const unique = (items = []) => {
+    return Array.from(
+      new Set(
+        items
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      )
+    );
+  };
+
+  const payload = {
+    name: String(member.name || '').trim(),
+    nim: String(member.nim || '').trim(),
+    cohort: String(member.cohort || member.letting || member.angkatan || '').trim(),
+    role: member.role || 'member',
+    status: member.status || 'pending',
+    level: Math.max(1, Number(member.level) || 1),
+    xp: Math.max(0, Number(member.xp) || 0),
+    xpToNextLevel: Math.max(100, Number(member.xpToNextLevel) || 100),
+    totalXp: Math.max(0, Number(member.totalXp) || 0),
+    coins: Math.max(0, Number(member.coins) || 0),
+    badges: unique(member.badges || []),
+    titles: unique(member.titles || []),
+    ownedBadges: unique(member.ownedBadges || []),
+    ownedTitles: unique(member.ownedTitles || []),
+    completedCourses: unique(member.completedCourses || []),
+    completedStages: unique(member.completedStages || []),
+    passedStages: unique(member.passedStages || []),
+    unopenedChests: unique(member.unopenedChests || []),
+    openedChests: unique(member.openedChests || []),
+    completedChallenges: unique(member.completedChallenges || []),
+    updatedAt: new Date().toISOString()
+  };
+
+  await updateMember(uid, payload);
+  await createActivity(`Data ${member.name || uid} dibersihkan.`, 'member');
+
+  return payload;
+}
+
 export async function removeRecord(collectionName, id) {
   await deleteDocument(collectionName, id);
 }
