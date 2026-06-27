@@ -214,6 +214,7 @@ export default function AdminPanel() {
   const [challengeForm, setChallengeForm] = useState(emptyChallenge);
   const [rewardForm, setRewardForm] = useState(emptyReward);
   const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [selectedMemberId, setSelectedMemberId] = useState('');
 
   async function reload() {
   setLoading(true);
@@ -289,6 +290,72 @@ const titleRewards = useMemo(() => {
 const chestRewards = useMemo(() => {
   return masterRewards.filter((reward) => String(reward.type || reward.category) === 'chest');
 }, [masterRewards]);
+
+const selectedMember = useMemo(() => {
+  if (!selectedMemberId) return null;
+
+  return allMembers.find((member) => {
+    return String(member.uid || member.id || '') === String(selectedMemberId);
+  }) || null;
+}, [allMembers, selectedMemberId]);
+
+function formatAdminDate(value) {
+  if (!value) return '-';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString('id-ID', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+}
+
+function getRewardById(rewardId) {
+  const cleanId = String(rewardId || '').trim();
+
+  if (!cleanId) return null;
+
+  return masterRewards.find((reward) => String(reward.id) === cleanId) || null;
+}
+
+function getRewardLabel(rewardId, fallbackIcon = '🏅') {
+  const reward = getRewardById(rewardId);
+
+  if (!reward) {
+    return `${fallbackIcon} ${rewardId}`;
+  }
+
+  return `${reward.icon || fallbackIcon} ${reward.name || reward.title || reward.id}`;
+}
+
+function isMemberCompletedCourse(member, course) {
+  const courseId = String(course.id || '');
+  const courseStage = String(course.stage || course.order || '');
+
+  const completedCourses = (member.completedCourses || []).map(String);
+  const completedStages = [
+    ...(member.completedStages || []),
+    ...(member.passedStages || [])
+  ].map(String);
+
+  return completedCourses.includes(courseId) || completedStages.includes(courseStage);
+}
+
+function getMemberCourseProgress(member, course) {
+  const courseId = String(course.id || '');
+  const courseStage = String(course.stage || course.order || '');
+
+  return (
+    member.stageProgress?.[courseId] ||
+    member.stageProgress?.[courseStage] ||
+    member.courseProgress?.[courseId] ||
+    null
+  );
+}
 
 useEffect(() => {
 if (!selectedCourse || activeTab !== 'learning-content') return;
@@ -732,20 +799,245 @@ async function handleRejectChallengeSubmission(submission) {
 
 
       {activeTab === 'members' ? (
-        <section className="card-grid">
-          {allMembers.length ? allMembers.map((member) => (
-            <PixelCard className="member-card" key={member.uid}>
-              <h3>{member.avatar} {member.name}</h3>
-              <p>{member.nim} · {member.cohort}</p>
-              <span className="status-pill">{member.status}</span>
-              <div className="member-actions">
-                <PixelButton onClick={() => handleApprove(member, 'approved')}>Setujui</PixelButton>
-                <PixelButton variant="secondary" onClick={() => handleApprove(member, 'rejected')}>Tolak</PixelButton>
+  <>
+    <section className="card-grid">
+      {allMembers.length ? allMembers.map((member) => (
+        <PixelCard className="member-card" key={member.uid}>
+          <h3>{member.avatar} {member.name}</h3>
+          <p>{member.nim} · Letting {member.cohort || '-'}</p>
+
+          <span className={`status-pill ${member.status || 'pending'}`}>
+            {member.status || 'pending'}
+          </span>
+
+          <div className="member-mini-stats">
+            <span>Level {member.level || 1}</span>
+            <span>{Number(member.xp || 0)}/{Number(member.xpToNextLevel || 100)} XP</span>
+            <span>{Number(member.coins || 0)} koin</span>
+          </div>
+
+          <div className="member-actions">
+            <PixelButton
+              type="button"
+              variant="secondary"
+              onClick={() => setSelectedMemberId(member.uid || member.id)}
+            >
+              Detail
+            </PixelButton>
+
+            <PixelButton
+              type="button"
+              onClick={() => handleApprove(member, 'approved')}
+            >
+              Setujui
+            </PixelButton>
+
+            <PixelButton
+              type="button"
+              variant="secondary"
+              onClick={() => handleApprove(member, 'rejected')}
+            >
+              Tolak
+            </PixelButton>
+          </div>
+        </PixelCard>
+      )) : (
+        <PixelCard>Belum ada anggota.</PixelCard>
+      )}
+    </section>
+
+    {selectedMember ? (
+      <section className="admin-member-detail-section">
+        <PixelCard className="admin-member-detail-card">
+          <div className="section-title-row">
+            <div>
+              <p className="eyebrow">Detail Progress Member</p>
+              <h2>{selectedMember.avatar} {selectedMember.name}</h2>
+              <p>{selectedMember.nim} · Letting {selectedMember.cohort || '-'}</p>
+            </div>
+
+            <PixelButton
+              type="button"
+              variant="secondary"
+              onClick={() => setSelectedMemberId('')}
+            >
+              Tutup Detail
+            </PixelButton>
+          </div>
+
+          <div className="member-detail-stats">
+            <div>
+              <strong>{selectedMember.level || 1}</strong>
+              <span>Level</span>
+            </div>
+
+            <div>
+              <strong>{Number(selectedMember.xp || 0)}/{Number(selectedMember.xpToNextLevel || 100)}</strong>
+              <span>XP Sekarang</span>
+            </div>
+
+            <div>
+              <strong>{Number(selectedMember.totalXp || 0)}</strong>
+              <span>Total XP</span>
+            </div>
+
+            <div>
+              <strong>{Number(selectedMember.coins || 0)}</strong>
+              <span>Koin</span>
+            </div>
+
+            <div>
+              <strong>{(selectedMember.completedCourses || []).length}</strong>
+              <span>Course Selesai</span>
+            </div>
+
+            <div>
+              <strong>{(selectedMember.completedChallenges || []).length}</strong>
+              <span>Challenge Selesai</span>
+            </div>
+          </div>
+
+          <div className="member-detail-grid">
+            <div className="member-detail-box">
+              <h3>Progress Stage</h3>
+
+              <div className="member-stage-list">
+                {sortedCourses.length ? sortedCourses.map((course) => {
+                  const completed = isMemberCompletedCourse(selectedMember, course);
+                  const progress = getMemberCourseProgress(selectedMember, course);
+
+                  return (
+                    <div
+                      className={completed ? 'member-stage-row done' : 'member-stage-row'}
+                      key={course.id}
+                    >
+                      <div>
+                        <strong>Stage {course.stage || course.order}: {course.title}</strong>
+                        <p>
+                          {completed ? 'Selesai' : 'Belum selesai'}
+                          {progress?.score ? ` · Nilai ${progress.score}` : ''}
+                          {progress?.bestScore ? ` · Nilai terbaik ${progress.bestScore}` : ''}
+                        </p>
+                      </div>
+
+                      <span>{completed ? '✅' : '⏳'}</span>
+                    </div>
+                  );
+                }) : (
+                  <p>Belum ada stage.</p>
+                )}
               </div>
-            </PixelCard>
-          )) : <PixelCard>Belum ada anggota.</PixelCard>}
-        </section>
-      ) : null}
+            </div>
+
+            <div className="member-detail-box">
+              <h3>Riwayat Quiz</h3>
+
+              <div className="member-history-list">
+                {(selectedMember.quizHistory || []).length ? (
+                  [...(selectedMember.quizHistory || [])]
+                    .reverse()
+                    .slice(0, 8)
+                    .map((history, index) => (
+                      <div className="member-history-row" key={`${history.courseId || index}-${index}`}>
+                        <strong>
+                          Stage {history.courseId || history.stage || '-'}
+                        </strong>
+
+                        <p>
+                          Nilai: {history.score ?? '-'}
+                          {history.passed !== undefined ? ` · ${history.passed ? 'Lulus' : 'Belum lulus'}` : ''}
+                        </p>
+
+                        <small>
+                          {formatAdminDate(history.createdAt || history.date || history.completedAt)}
+                        </small>
+                      </div>
+                    ))
+                ) : (
+                  <p>Belum ada riwayat quiz.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="member-detail-box">
+              <h3>Reward Dimiliki</h3>
+
+              <div className="member-reward-list">
+                <div>
+                  <strong>Badge</strong>
+                  {(selectedMember.badges || selectedMember.ownedBadges || []).length ? (
+                    <div className="member-chip-list">
+                      {[
+                        ...(selectedMember.badges || []),
+                        ...(selectedMember.ownedBadges || [])
+                      ].map((badgeId) => (
+                        <span className="member-chip" key={badgeId}>
+                          {getRewardLabel(badgeId, '🏅')}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Belum punya badge.</p>
+                  )}
+                </div>
+
+                <div>
+                  <strong>Title</strong>
+                  {(selectedMember.titles || selectedMember.ownedTitles || []).length ? (
+                    <div className="member-chip-list">
+                      {[
+                        ...(selectedMember.titles || []),
+                        ...(selectedMember.ownedTitles || [])
+                      ].map((titleId) => (
+                        <span className="member-chip" key={titleId}>
+                          {getRewardLabel(titleId, '🎖️')}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Belum punya title.</p>
+                  )}
+                </div>
+
+                <div>
+                  <strong>Chest Belum Dibuka</strong>
+                  {(selectedMember.unopenedChests || []).length ? (
+                    <div className="member-chip-list">
+                      {(selectedMember.unopenedChests || []).map((chestId) => (
+                        <span className="member-chip" key={chestId}>
+                          {getRewardLabel(chestId, '🎁')}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p>Tidak ada chest.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="member-detail-box">
+              <h3>Tantangan</h3>
+
+              <div className="member-history-list">
+                {(selectedMember.completedChallenges || []).length ? (
+                  (selectedMember.completedChallenges || []).map((challengeId) => (
+                    <div className="member-history-row" key={challengeId}>
+                      <strong>{getChallengeTitle(challengeId)}</strong>
+                      <p>Selesai</p>
+                    </div>
+                  ))
+                ) : (
+                  <p>Belum ada tantangan selesai.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </PixelCard>
+      </section>
+    ) : null}
+  </>
+) : null}
 
 
       

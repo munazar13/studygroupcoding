@@ -2228,3 +2228,138 @@ flex-direction: column;
 .mini-insert-button {
   margin: 0.35rem 0 0.75rem;
 }
+
+.member-mini-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.75rem 0;
+}
+
+.member-mini-stats span {
+  padding: 0.25rem 0.55rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #f8fafc;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.admin-member-detail-section {
+  margin-top: 1.25rem;
+}
+
+.admin-member-detail-card {
+  display: grid;
+  gap: 1.2rem;
+}
+
+.member-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.member-detail-stats > div {
+  border: 3px solid var(--ink);
+  border-radius: 16px;
+  background: #ffffff;
+  padding: 0.85rem;
+  box-shadow: 3px 3px 0 var(--ink);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.member-detail-stats strong {
+  font-size: 1.2rem;
+}
+
+.member-detail-stats span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.member-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.member-detail-box {
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: #f8fafc;
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.member-detail-box h3 {
+  margin: 0;
+}
+
+.member-stage-list,
+.member-history-list,
+.member-reward-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.member-stage-row,
+.member-history-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  border: 2px solid var(--ink);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 0.75rem;
+}
+
+.member-stage-row.done {
+  background: #dcfce7;
+}
+
+.member-stage-row p,
+.member-history-row p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.member-history-row small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.member-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+}
+
+.member-chip {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.3rem 0.6rem;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 900;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+@media (max-width: 900px) {
+  .member-detail-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .member-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
