@@ -67,6 +67,20 @@ function compareMainRank(a, b) {
   return getCompletedStageCount(b) - getCompletedStageCount(a);
 }
 
+function formatLetting(member = {}) {
+  const letting = String(member.cohort || member.letting || member.angkatan || '').trim();
+
+  if (!letting) {
+    return 'Letting belum diisi';
+  }
+
+  if (letting.toLowerCase().includes('letting')) {
+    return letting;
+  }
+
+  return `Letting ${letting}`;
+}
+
 export default function Leaderboard() {
   const [members, setMembers] = useState([]);
   const [rewards, setRewards] = useState([]);
@@ -192,6 +206,9 @@ export default function Leaderboard() {
               <div className="leader-info">
                 <div className="leader-name-row">
                   <h3>{member.name}</h3>
+                  <p className="leader-letting">
+                  {formatLetting(member)}
+                  </p>
 
                   {activeBadge ? (
                     <span className={`leader-badge-pill ${getRarityClassName(activeBadge.rarity)}`}>
