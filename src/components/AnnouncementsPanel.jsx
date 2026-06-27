@@ -94,43 +94,58 @@ export default function AnnouncementsPanel({ limit = 3 }) {
   }
 
   return (
-    <section className="announcement-panel">
-      <div className="section-title-row">
-        <div>
-          <p className="eyebrow">Pengumuman</p>
-          <h2>Info Terbaru</h2>
-        </div>
-
-        <span>{visibleAnnouncements.length} info</span>
+  <section className="announcement-panel">
+    <div className="announcement-panel-head">
+      <div>
+        <p className="eyebrow">Pengumuman</p>
+        <h2>Info Terbaru</h2>
       </div>
 
-      <div className="announcement-list">
-        {visibleAnnouncements.map((announcement) => (
+      <span className="announcement-count">
+        {visibleAnnouncements.length} info
+      </span>
+    </div>
+
+    <div className="announcement-list">
+      {visibleAnnouncements.map((announcement) => {
+        const priority = String(announcement.priority || 'normal').toLowerCase();
+        const showPriority = priority === 'high' || priority === 'urgent';
+
+        return (
           <PixelCard
-            className={`announcement-card priority-${announcement.priority || 'normal'}`}
+            className={`announcement-card priority-${priority}`}
             key={announcement.id}
           >
-            <div className="announcement-card-head">
-              <span className="announcement-category">
-                {announcement.category || 'Info'}
-              </span>
-
-              <span className={`announcement-priority ${announcement.priority || 'normal'}`}>
-                {getPriorityLabel(announcement.priority)}
-              </span>
-
-              {announcement.pinned ? (
-                <span className="announcement-pin">
-                  📌 Pinned
-                </span>
-              ) : null}
+            <div className="announcement-icon">
+              {priority === 'urgent' ? '🚨' : priority === 'high' ? '📌' : '📢'}
             </div>
 
-            <h3>{announcement.title}</h3>
-            <p>{announcement.message}</p>
+            <div className="announcement-body">
+              <div className="announcement-card-head">
+                <span className="announcement-category">
+                  {announcement.category || 'Info'}
+                </span>
+
+                {showPriority ? (
+                  <span className={`announcement-priority ${priority}`}>
+                    {getPriorityLabel(priority)}
+                  </span>
+                ) : null}
+
+                {announcement.pinned ? (
+                  <span className="announcement-pin">
+                    Pinned
+                  </span>
+                ) : null}
+              </div>
+
+              <h3>{announcement.title}</h3>
+              <p>{announcement.message}</p>
+            </div>
           </PixelCard>
-        ))}
-      </div>
-    </section>
-  );
+        );
+      })}
+    </div>
+  </section>
+);
 }
