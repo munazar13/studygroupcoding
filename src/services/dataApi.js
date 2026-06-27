@@ -1097,6 +1097,59 @@ export async function updateMemberAdminStats(member, stats = {}) {
   return payload;
 }
 
+export async function grantMemberReward(member, reward) {
+  const uid = getMemberUid(member);
+
+  const rewardId = String(reward?.id || '').trim();
+  const rewardType = String(reward?.type || reward?.category || '').trim();
+
+  if (!rewardId) {
+    throw new Error('Reward tidak valid.');
+  }
+
+  if (!['badge', 'title', 'chest'].includes(rewardType)) {
+    throw new Error('Jenis reward harus badge, title, atau chest.');
+  }
+
+  const unique = (items = []) => {
+    return Array.from(
+      new Set(
+        items
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+      )
+    );
+  };
+
+  const payload = {
+    updatedAt: new Date().toISOString()
+  };
+
+  if (rewardType === 'badge') {
+    payload.badges = unique([...(member.badges || []), rewardId]);
+    payload.ownedBadges = unique([...(member.ownedBadges || []), rewardId]);
+  }
+
+  if (rewardType === 'title') {
+    payload.titles = unique([...(member.titles || []), rewardId]);
+    payload.ownedTitles = unique([...(member.ownedTitles || []), rewardId]);
+  }
+
+  if (rewardType === 'chest') {
+    payload.unopenedChests = unique([...(member.unopenedChests || []), rewardId]);
+  }
+
+  payload.unlockedRewards = unique([...(member.unlockedRewards || []), rewardId]);
+
+  await updateMember(uid, payload);
+  await createActivity(
+    `Reward ${reward.name || reward.title || rewardId} diberikan ke ${member.name || uid}.`,
+    'member'
+  );
+
+  return payload;
+}
+
 export async function removeRecord(collectionName, id) {
   await deleteDocument(collectionName, id);
 }

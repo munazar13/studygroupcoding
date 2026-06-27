@@ -11,6 +11,7 @@ import {
   rejectChallengeSubmission,
   cleanMemberData,
   exportAllData,
+  grantMemberReward,
   importSystemData,
   loadAdminContentData,
   loadChallengeData,
@@ -228,6 +229,7 @@ export default function AdminPanel() {
   totalXp: 0,
   coins: 0
 });
+  const [memberRewardGrantId, setMemberRewardGrantId] = useState('');
 
   async function reload() {
   setLoading(true);
@@ -485,6 +487,49 @@ function appendToQuestionField(fieldName, snippet) {
     await refreshMember();
   } catch (error) {
     showToast(error.message || 'Gagal memproses anggota.', 'error');
+  }
+}
+
+  async function handleGrantRewardToSelectedMember(event) {
+  event.preventDefault();
+
+  if (!selectedMember) return;
+
+  const reward = masterRewards.find((item) => {
+    return String(item.id) === String});
+
+  const [memberRewardGrantId, setMemberRewardGrantId] = useState('');
+
+    async function handleGrantRewardToSelectedMember(event) {
+  event.preventDefault();
+
+  if (!selectedMember) return;
+
+  const reward = masterRewards.find((item) => {
+    return String(item.id) === String(memberRewardGrantId);
+  });
+
+  if (!reward) {
+    showToast('Pilih reward terlebih dahulu.', 'error');
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Berikan reward "${reward.name || reward.title || reward.id}" ke "${selectedMember.name}"?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await grantMemberReward(selectedMember, reward);
+
+    setMemberRewardGrantId('');
+    showToast('Reward berhasil diberikan ke member.');
+    await reload();
+    await refreshMember();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal memberikan reward ke member.', 'error');
   }
 }
 
@@ -1151,6 +1196,62 @@ async function handleRejectChallengeSubmission(submission) {
       Batalkan Perubahan
     </PixelButton>
   </div>
+</form>
+
+          <form className="member-grant-reward-form" onSubmit={handleGrantRewardToSelectedMember}>
+  <div>
+    <p className="eyebrow">Reward Manual Admin</p>
+    <h3>Berikan Badge, Title, atau Chest</h3>
+    <p>
+      Pilih reward dari Reward Master, lalu berikan langsung ke member ini.
+    </p>
+  </div>
+
+  <div className="member-grant-reward-row">
+    <label className="form-field">
+      <span>Pilih Reward</span>
+      <select
+        value={memberRewardGrantId}
+        onChange={(e) => setMemberRewardGrantId(e.target.value)}
+      >
+        <option value="">Pilih reward master</option>
+
+        {masterRewards.map((reward) => (
+          <option key={reward.id} value={reward.id}>
+            {reward.icon || '🎁'} {reward.name || reward.title || reward.id} · {reward.type || reward.category} · {getRarityLabel(reward.rarity)}
+          </option>
+        ))}
+      </select>
+    </label>
+
+    <PixelButton type="submit">
+      Berikan Reward
+    </PixelButton>
+  </div>
+
+  {memberRewardGrantId ? (
+    <div className="member-grant-preview">
+      {(() => {
+        const reward = masterRewards.find((item) => String(item.id) === String(memberRewardGrantId));
+
+        if (!reward) return null;
+
+        return (
+          <>
+            <strong>
+              {reward.icon || '🎁'} {reward.name || reward.title || reward.id}
+            </strong>
+
+            <span className={`admin-rarity-pill ${getRarityClassName(reward.rarity)}`}>
+              {getRarityLabel(reward.rarity)}
+            </span>
+
+            <p>{reward.description || 'Tidak ada deskripsi.'}</p>
+          </>
+        );
+      })()}
+    </div>
+  ) : null}
 </form>
 
           <div className="member-detail-grid">
