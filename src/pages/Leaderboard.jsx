@@ -81,6 +81,14 @@ function formatLetting(member = {}) {
   return `Letting ${letting}`;
 }
 
+function getRarityClassName(rarity) {
+  const cleanRarity = String(rarity || 'common')
+    .trim()
+    .toLowerCase();
+
+  return `rarity-${cleanRarity}`;
+}
+
 export default function Leaderboard() {
   const [members, setMembers] = useState([]);
   const [rewards, setRewards] = useState([]);
@@ -211,7 +219,7 @@ export default function Leaderboard() {
                   </p>
 
                   {activeBadge ? (
-                    <span className={`leader-badge-pill ${getRarityClassName(activeBadge.rarity)}`}>
+                    <span className={`leader-badge-pill ${getRarityClassName(activeBadge.rarity || 'common')}`}>
                       🏅 {getRewardName(activeBadge)}
                     </span>
                   ) : null}
@@ -219,9 +227,9 @@ export default function Leaderboard() {
 
                 <p>
                   {activeTitle ? (
-                    <span className={`leader-title-pill ${getRarityClassName(activeTitle.rarity)}`}>
-                      🎖️ {getRewardName(activeTitle)}
-                    </span>
+                   <span className={`leader-title-pill ${getRarityClassName(activeTitle.rarity || 'common')}`}>
+                    🎖️ {getRewardName(activeTitle)}
+                  </span>
                   ) : (
                     <span>Belum memakai title</span>
                   )}

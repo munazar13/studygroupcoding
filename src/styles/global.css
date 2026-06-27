@@ -2049,3 +2049,58 @@ flex-direction: column;
   font-weight: 800;
   color: var(--muted);
 }
+
+.rarity-common {
+  background: #e5e7eb;
+  color: #111827;
+  border: 2px solid #9ca3af;
+}
+
+.rarity-uncommon {
+  background: #dcfce7;
+  color: #14532d;
+  border: 2px solid #22c55e;
+}
+
+.rarity-rare {
+  background: #dbeafe;
+  color: #1e3a8a;
+  border: 2px solid #3b82f6;
+}
+
+.rarity-epic {
+  background: #f3e8ff;
+  color: #581c87;
+  border: 2px solid #a855f7;
+}
+
+.rarity-legendary {
+  background: #fef3c7;
+  color: #78350f;
+  border: 2px solid #f59e0b;
+}
+
+.rarity-mythic {
+  background: #ffe4e6;
+  color: #881337;
+  border: 2px solid #f43f5e;
+}
+
+.leader-badge-pill,
+.leader-title-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  line-height: 1.2;
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+.leader-title-pill {
+  margin-top: 0.25rem;
+}
