@@ -540,6 +540,215 @@ function appendToQuestionField(fieldName, snippet) {
   });
 }
 
+  function isBlank(value) {
+  return !String(value || '').trim();
+}
+
+function asPositiveNumber(value, fallback = 0) {
+  const number = Number(value);
+
+  if (Number.isNaN(number)) return fallback;
+
+  return number;
+}
+
+function validateCourseForm() {
+  const stageId = String(courseForm.id || courseForm.stage || courseForm.order || '').trim();
+  const minScore = asPositiveNumber(courseForm.minScore, 0);
+  const xpReward = asPositiveNumber(courseForm.xpReward, 0);
+  const coinReward = asPositiveNumber(courseForm.coinReward, 0);
+
+  if (!stageId) {
+    showToast('ID atau nomor stage wajib diisi.', 'error');
+    return false;
+  }
+
+  if (isBlank(courseForm.title)) {
+    showToast('Judul stage wajib diisi.', 'error');
+    return false;
+  }
+
+  if (isBlank(courseForm.area)) {
+    showToast('Area stage wajib diisi.', 'error');
+    return false;
+  }
+
+  if (isBlank(courseForm.theme)) {
+    showToast('Deskripsi stage wajib diisi.', 'error');
+    return false;
+  }
+
+  if (minScore < 0 || minScore > 100) {
+    showToast('Nilai minimal harus antara 0 sampai 100.', 'error');
+    return false;
+  }
+
+  if (xpReward < 0) {
+    showToast('XP reward tidak boleh minus.', 'error');
+    return false;
+  }
+
+  if (coinReward < 0) {
+    showToast('Koin reward tidak boleh minus.', 'error');
+    return false;
+  }
+
+  if (courseForm.badgeRewardEnabled && isBlank(courseForm.badgeName)) {
+    showToast('Nama badge wajib diisi kalau reward badge aktif.', 'error');
+    return false;
+  }
+
+  if (courseForm.titleRewardEnabled && isBlank(courseForm.titleRewardName)) {
+    showToast('Nama title wajib diisi kalau reward title aktif.', 'error');
+    return false;
+  }
+
+  if (courseForm.hasChestReward && isBlank(courseForm.chestName)) {
+    showToast('Nama chest wajib diisi kalau reward chest aktif.', 'error');
+    return false;
+  }
+
+  return true;
+}
+
+function validateSectionForm() {
+  if (isBlank(sectionForm.courseId || activeCourseId)) {
+    showToast('Pilih stage untuk materi.', 'error');
+    return false;
+  }
+
+  if (isBlank(sectionForm.title)) {
+    showToast('Judul materi wajib diisi.', 'error');
+    return false;
+  }
+
+  if (isBlank(sectionForm.content)) {
+    showToast('Isi materi wajib diisi.', 'error');
+    return false;
+  }
+
+  if (asPositiveNumber(sectionForm.order, 0) < 1) {
+    showToast('Urutan materi minimal 1.', 'error');
+    return false;
+  }
+
+  return true;
+}
+
+function validateQuestionForm() {
+  const options = [
+    questionForm.optionA,
+    questionForm.optionB,
+    questionForm.optionC,
+    questionForm.optionD
+  ];
+
+  if (isBlank(questionForm.courseId || activeCourseId)) {
+    showToast('Pilih stage untuk soal.', 'error');
+    return false;
+  }
+
+  if (asPositiveNumber(questionForm.order, 0) < 1) {
+    showToast('Urutan soal minimal 1.', 'error');
+    return false;
+  }
+
+  if (isBlank(questionForm.question)) {
+    showToast('Pertanyaan wajib diisi.', 'error');
+    return false;
+  }
+
+  if (options.some((option) => isBlank(option))) {
+    showToast('Pilihan A, B, C, dan D wajib diisi.', 'error');
+    return false;
+  }
+
+  if (![0, 1, 2, 3].includes(Number(questionForm.correctIndex))) {
+    showToast('Jawaban benar harus A, B, C, atau D.', 'error');
+    return false;
+  }
+
+  if (isBlank(questionForm.explanation)) {
+    showToast('Pembahasan jawaban wajib diisi.', 'error');
+    return false;
+  }
+
+  return true;
+}
+
+function validateChallengeForm() {
+  if (isBlank(challengeForm.title)) {
+    showToast('Judul tantangan wajib diisi.', 'error');
+    return false;
+  }
+
+  if (isBlank(challengeForm.description)) {
+    showToast('Deskripsi tantangan wajib diisi.', 'error');
+    return false;
+  }
+
+  if (asPositiveNumber(challengeForm.order, 0) < 1) {
+    showToast('Urutan tantangan minimal 1.', 'error');
+    return false;
+  }
+
+  if (challengeForm.startDate && challengeForm.endDate) {
+    const startDate = new Date(challengeForm.startDate);
+    const endDate = new Date(challengeForm.endDate);
+
+    if (startDate > endDate) {
+      showToast('Tanggal mulai tidak boleh lebih besar dari tanggal berakhir.', 'error');
+      return false;
+    }
+  }
+
+  if (challengeForm.rewardType === 'coins' && asPositiveNumber(challengeForm.rewardCoins, 0) < 1) {
+    showToast('Reward koin minimal 1.', 'error');
+    return false;
+  }
+
+  if (challengeForm.rewardType === 'xp' && asPositiveNumber(challengeForm.rewardXp, 0) < 1) {
+    showToast('Reward XP minimal 1.', 'error');
+    return false;
+  }
+
+  if (['badge', 'title', 'chest'].includes(challengeForm.rewardType) && isBlank(challengeForm.rewardName)) {
+    showToast('Nama reward tantangan wajib diisi.', 'error');
+    return false;
+  }
+
+  return true;
+}
+
+function validateRewardForm() {
+  if (!['badge', 'title', 'chest'].includes(String(rewardForm.type || '').trim())) {
+    showToast('Jenis reward harus badge, title, atau chest.', 'error');
+    return false;
+  }
+
+  if (isBlank(rewardForm.name)) {
+    showToast('Nama reward wajib diisi.', 'error');
+    return false;
+  }
+
+  if (isBlank(rewardForm.icon)) {
+    showToast('Icon reward wajib diisi.', 'error');
+    return false;
+  }
+
+  if (!RARITY_LIST.includes(String(rewardForm.rarity || '').trim())) {
+    showToast('Rarity reward tidak valid.', 'error');
+    return false;
+  }
+
+  if (asPositiveNumber(rewardForm.order, 0) < 1) {
+    showToast('Urutan reward minimal 1.', 'error');
+    return false;
+  }
+
+  return true;
+}
+
   async function handleImportSystem() {
     try {
       const count = await importSystemData();
@@ -737,8 +946,11 @@ async function handleCleanSelectedMemberData() {
 }
 
   async function handleCourseSubmit(event) {
-    event.preventDefault();
-    try {
+  event.preventDefault();
+
+  if (!validateCourseForm()) return;
+
+  try {
       const id = String(courseForm.id || courseForm.stage || courseForm.order);
       await upsertCourse({ ...courseForm, id });
       setCourseForm(emptyCourse);
@@ -750,8 +962,11 @@ async function handleCleanSelectedMemberData() {
   }
 
   async function handleSectionSubmit(event) {
-    event.preventDefault();
-    try {
+  event.preventDefault();
+
+  if (!validateSectionForm()) return;
+
+  try {
       await upsertCourseSection({
         ...sectionForm,
         id: sectionForm.id || `section-${sectionForm.courseId}-${Date.now()}`
@@ -766,6 +981,8 @@ async function handleCleanSelectedMemberData() {
 
   async function handleQuestionSubmit(event) {
   event.preventDefault();
+
+  if (!validateQuestionForm()) return;
 
   try {
     const courseId = String(questionForm.courseId || activeCourseId);
@@ -880,6 +1097,8 @@ async function handleCleanSelectedMemberData() {
   async function handleRewardSubmit(event) {
   event.preventDefault();
 
+  if (!validateRewardForm()) return;
+
   try {
     await upsertReward(rewardForm);
 
@@ -926,6 +1145,8 @@ async function handleDeleteReward(rewardId) {
 
   async function handleChallengeSubmit(event) {
   event.preventDefault();
+
+  if (!validateChallengeForm()) return;
 
   try {
     await upsertChallenge({
