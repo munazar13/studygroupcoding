@@ -2822,7 +2822,7 @@ async function handleRejectChallengeSubmission(submission) {
               </div>
             </form>
           </PixelCard>
-          <div className="admin-list">
+          <div className="admin-announcement-list">
             {contentData.courses.length ? contentData.courses.map((course) => (
               <PixelCard key={course.id}>
                 <h3>Stage {course.stage}: {course.title}</h3>
