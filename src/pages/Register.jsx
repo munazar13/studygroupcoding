@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 
 const avatars = ['🧑‍💻', '🧙', '🛡️', '🏹', '🤖', '🐱'];
-
+const LETTING_OPTIONS = ['2022', '2023', '2024', '2025', '2026'];
 export default function Register() {
   const [form, setForm] = useState({
     name: '',
@@ -76,12 +76,20 @@ export default function Register() {
           </label>
           <label>
             Angkatan
-            <input
-              required
-              placeholder="Format: 25"
-              value={form.cohort}
-              onChange={(event) => setForm({ ...form, cohort: event.target.value })}
-            />
+            <select
+            name="cohort"
+            value={form.cohort}
+            onChange={handleChange}
+            required
+          >
+            <option value="">Pilih Letting</option>
+
+            {LETTING_OPTIONS.map((year) => (
+              <option key={year} value={year}>
+                Letting {year}
+              </option>
+            ))}
+          </select>
           </label>
           <label>
             Password
