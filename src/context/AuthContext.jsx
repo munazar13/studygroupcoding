@@ -6,6 +6,7 @@ import {
   listenToAuth,
   logoutFirebase,
   signInAdmin,
+  sendMemberPasswordReset,
   signInMember,
   updateMember
 } from '../services/firebase';
@@ -20,6 +21,9 @@ function normalizeMember(member) {
   return {
   role: 'member',
   status: 'pending',
+  authEmail: '',
+  recoveryEmail: '',
+  schemaVersion: 3,
 
   level: 1,
   xp: 0,
@@ -56,13 +60,31 @@ function normalizeMember(member) {
   coinTransactions: [],
   quizHistory: [],
   activityLogs: [],
+  materialBookmarks: [],
+  privateNotes: {},
+  ownedShopItems: [],
+  shopInventory: [],
+  shopPurchaseHistory: [],
+  notifications: [],
+  activeNameColor: '',
+  activeProfileDecoration: '',
   challengeSubmissions: [],
   completedChallenges: [],
   challengeRewardHistory: [],
   lastChallengeReward: null,
 
+  finalProjectStatus: '',
+  finalProjectSubmissionId: '',
+  finalProjectSubmittedAt: '',
+  finalProjectAdminNote: '',
+  finalProjectReviewedAt: '',
+  finalProjectApprovedAt: '',
+
   finalQuestComplete: false,
+  certificateStatus: '',
   certificateCode: '',
+  certificateIssuedAt: '',
+  certificateRevokedAt: '',
   lastStudyDate: '',
 
   ...member
@@ -147,6 +169,10 @@ export function AuthProvider({ children }) {
     return normalizeMember(member);
   }
 
+  async function resetMemberPassword(identifier) {
+    return sendMemberPasswordReset(identifier);
+  }
+
   async function logout() {
     await logoutFirebase();
     setCurrentMember(null);
@@ -176,6 +202,7 @@ export function AuthProvider({ children }) {
     loginMember,
     loginAdmin,
     registerMember,
+    resetMemberPassword,
     logout,
     refreshMember,
     updateCurrentMember

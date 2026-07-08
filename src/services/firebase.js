@@ -1,7 +1,8 @@
-import { initializeApp } from 'firebase/app';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
   getAuth,
+  sendPasswordResetEmail,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
@@ -30,7 +31,7 @@ let auth = null;
 let db = null;
 
 if (isFirebaseConfigReady()) {
-  app = initializeApp(firebaseConfig);
+  app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
 }
@@ -74,12 +75,157 @@ export function adminIdentifierToEmail(identifier) {
   return nimToEmail(value);
 }
 
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isConfiguredAdminEmail(email) {
+  return normalizeEmail(email) === normalizeEmail(firebaseAppOptions.adminEmail);
+}
+
+function createVirtualAdminMember(user) {
+  const now = new Date().toISOString();
+
+  return {
+    id: user.uid,
+    uid: user.uid,
+    name: user.displayName || 'Admin Study Group Coding',
+    nim: 'admin',
+    cohort: 'Admin',
+    avatar: '🛡️',
+    authEmail: normalizeEmail(user.email),
+    recoveryEmail: normalizeEmail(user.email),
+    role: 'admin',
+    status: 'approved',
+    schemaVersion: 3,
+    level: 1,
+    xp: 0,
+    xpToNextLevel: 100,
+    totalXp: 0,
+    coins: 0,
+    streak: 0,
+    currentStage: 1,
+    completedCourses: [],
+    completedStages: [],
+    passedStages: [],
+    stageProgress: {},
+    badges: [],
+    titles: [],
+    frames: [],
+    avatars: [],
+    ownedBadges: [],
+    ownedTitles: [],
+    ownedFrames: [],
+    ownedAvatars: [],
+    activeBadge: '',
+    activeTitle: '',
+    activeFrame: '',
+    activeAvatar: '',
+    unlockedRewards: [],
+    unopenedChests: [],
+    openedChests: [],
+    chestHistory: [],
+    coinTransactions: [],
+    quizHistory: [],
+    activityLogs: [],
+    materialBookmarks: [],
+    privateNotes: {},
+    ownedShopItems: [],
+    shopInventory: [],
+    shopPurchaseHistory: [],
+    notifications: [],
+    activeNameColor: '',
+    activeProfileDecoration: '',
+    challengeSubmissions: [],
+    completedChallenges: [],
+    challengeRewardHistory: [],
+    lastChallengeReward: null,
+    finalProjectStatus: '',
+    finalProjectSubmissionId: '',
+    finalProjectSubmittedAt: '',
+    finalProjectAdminNote: '',
+    finalProjectReviewedAt: '',
+    finalProjectApprovedAt: '',
+    finalQuestComplete: false,
+    certificateStatus: '',
+    certificateCode: '',
+    certificateIssuedAt: '',
+    certificateRevokedAt: '',
+    lastStudyDate: '',
+    createdAt: now,
+    updatedAt: now,
+    virtualAdmin: true
+  };
+}
+
+async function findMemberAuthRecordByNim(nim) {
+  if (!firebaseReady()) {
+    throw new Error('Firebase belum dikonfigurasi.');
+  }
+
+  const cleanNim = normalizeNim(nim);
+
+  if (!cleanNim) {
+    throw new Error('NIM wajib diisi.');
+  }
+
+  const snapshot = await getDoc(doc(db, 'nimIndex', cleanNim));
+
+  if (snapshot.exists()) {
+    const data = snapshot.data();
+
+    return {
+      nim: cleanNim,
+      uid: data.uid || '',
+      authEmail: normalizeEmail(data.authEmail || data.recoveryEmail || data.email),
+      recoveryEmail: normalizeEmail(data.recoveryEmail || data.authEmail || data.email),
+      isLegacyGeneratedEmail: false
+    };
+  }
+
+  return {
+    nim: cleanNim,
+    uid: '',
+    authEmail: nimToEmail(cleanNim),
+    recoveryEmail: '',
+    isLegacyGeneratedEmail: true
+  };
+}
+
 export async function signInMember(nim, password) {
   if (!firebaseReady()) {
     throw new Error('Firebase belum dikonfigurasi.');
   }
 
-  return signInWithEmailAndPassword(auth, nimToEmail(nim), password);
+  const record = await findMemberAuthRecordByNim(nim);
+
+  return signInWithEmailAndPassword(auth, record.authEmail, password);
+}
+
+export async function sendMemberPasswordReset(identifier) {
+  if (!firebaseReady()) {
+    throw new Error('Firebase belum dikonfigurasi.');
+  }
+
+  const value = String(identifier || '').trim();
+
+  if (!value) {
+    throw new Error('Isi NIM atau email pemulihan terlebih dahulu.');
+  }
+
+  if (value.includes('@')) {
+    await sendPasswordResetEmail(auth, normalizeEmail(value));
+    return normalizeEmail(value);
+  }
+
+  const record = await findMemberAuthRecordByNim(value);
+
+  if (record.isLegacyGeneratedEmail) {
+    throw new Error('Akun lama ini belum punya email pemulihan. Tambahkan email pemulihan dulu dari profil atau daftar ulang sesuai arahan admin.');
+  }
+
+  await sendPasswordResetEmail(auth, record.authEmail);
+  return record.recoveryEmail || record.authEmail;
 }
 
 export async function signInAdmin(identifier, password) {
@@ -99,9 +245,12 @@ function createDefaultMember(payload, uid) {
     nim: normalizeNim(payload.nim),
     cohort: String(payload.cohort || '').trim(),
     avatar: payload.avatar || '🧑‍💻',
+    authEmail: normalizeEmail(payload.authEmail || payload.email),
+    recoveryEmail: normalizeEmail(payload.recoveryEmail || payload.email),
 
     role: 'member',
     status: 'pending',
+    schemaVersion: 3,
 
     level: 1,
     xp: 0,
@@ -138,14 +287,29 @@ function createDefaultMember(payload, uid) {
     coinTransactions: [],
     quizHistory: [],
     activityLogs: [],
+    ownedShopItems: [],
+    shopInventory: [],
+    shopPurchaseHistory: [],
+    notifications: [],
+    activeNameColor: '',
+    activeProfileDecoration: '',
 
     challengeSubmissions: [],
     completedChallenges: [],
     challengeRewardHistory: [],
     lastChallengeReward: null,
 
+    finalProjectStatus: '',
+    finalProjectSubmissionId: '',
+    finalProjectSubmittedAt: '',
+    finalProjectAdminNote: '',
+    finalProjectReviewedAt: '',
+    finalProjectApprovedAt: '',
     finalQuestComplete: false,
+    certificateStatus: '',
     certificateCode: '',
+    certificateIssuedAt: '',
+    certificateRevokedAt: '',
     lastStudyDate: '',
 
     createdAt: now,
@@ -158,7 +322,23 @@ export async function createMemberAccount(payload) {
     throw new Error('Firebase belum dikonfigurasi.');
   }
 
-  const authEmail = nimToEmail(payload.nim);
+  const cleanNim = normalizeNim(payload.nim);
+  const authEmail = normalizeEmail(payload.email || payload.recoveryEmail);
+
+  if (!cleanNim) {
+    throw new Error('NIM wajib diisi.');
+  }
+
+  if (!authEmail || !authEmail.includes('@')) {
+    throw new Error('Email pemulihan wajib diisi dengan format email yang benar.');
+  }
+
+  const nimIndexRef = doc(db, 'nimIndex', cleanNim);
+  const nimIndexSnapshot = await getDoc(nimIndexRef);
+
+  if (nimIndexSnapshot.exists()) {
+    throw new Error('NIM ini sudah terdaftar. Silakan login, bukan daftar ulang.');
+  }
 
   try {
     const credential = await createUserWithEmailAndPassword(
@@ -171,9 +351,26 @@ export async function createMemberAccount(payload) {
       displayName: payload.name
     });
 
-    const member = createDefaultMember(payload, credential.user.uid);
+    const member = createDefaultMember(
+      {
+        ...payload,
+        nim: cleanNim,
+        authEmail,
+        recoveryEmail: authEmail
+      },
+      credential.user.uid
+    );
 
     await setDoc(doc(db, 'members', credential.user.uid), member);
+
+    await setDoc(nimIndexRef, {
+      nim: cleanNim,
+      uid: credential.user.uid,
+      authEmail,
+      recoveryEmail: authEmail,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
 
     await createActivity(
       `${member.name} mendaftar dan menunggu persetujuan pengurus.`,
@@ -182,45 +379,11 @@ export async function createMemberAccount(payload) {
 
     return member;
   } catch (error) {
-    if (error.code !== 'auth/email-already-in-use') {
-      throw error;
+    if (error.code === 'auth/email-already-in-use') {
+      throw new Error('Email ini sudah dipakai. Gunakan email lain atau buka halaman lupa password.');
     }
 
-    const credential = await signInWithEmailAndPassword(
-      auth,
-      authEmail,
-      payload.password
-    );
-
-    const existingMember = await getMember(credential.user.uid);
-
-    if (existingMember) {
-      throw new Error('NIM ini sudah terdaftar. Silakan login, bukan daftar ulang.');
-    }
-
-    await updateProfile(credential.user, {
-      displayName: payload.name
-    });
-
-    const member = createDefaultMember(payload, credential.user.uid);
-
-    await setDoc(doc(db, 'members', credential.user.uid), member);
-
-    await createActivity(
-      `${member.name} m ulang.');
-    }
-
-    await updateProfile(credential.user, {
-      displayName: payload.name
-    });
-
-    const member = createDefaultMember(payload, credential.user.uid);
-
-    await setendaftar ulang dan menunggu persetujuan pengurus.`,
-      'member'
-    );
-
-    return member;
+    throw error;
   }
 }
 
@@ -245,7 +408,18 @@ export async function getMember(uid) {
   }
 
   const snapshot = await getDoc(doc(db, 'members', uid));
-  return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } : null;
+
+  if (snapshot.exists()) {
+    return { id: snapshot.id, ...snapshot.data() };
+  }
+
+  const activeUser = auth?.currentUser;
+
+  if (activeUser?.uid === uid && isConfiguredAdminEmail(activeUser.email)) {
+    return createVirtualAdminMember(activeUser);
+  }
+
+  return null;
 }
 
 export async function updateMember(uid, patch) {

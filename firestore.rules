@@ -14,12 +14,67 @@ service cloud.firestore {
       return get(memberPath(request.auth.uid));
     }
 
+    function isConfiguredAdminEmail() {
+      return signedIn()
+        && request.auth.token.email == 'admin@studygroupcoding.app';
+    }
+
     function isAdmin() {
-      return signedIn() && exists(memberPath(request.auth.uid)) && myMember().data.role == 'admin' && myMember().data.status == 'approved';
+      return isConfiguredAdminEmail()
+        || (
+          signedIn()
+          && exists(memberPath(request.auth.uid))
+          && myMember().data.role == 'admin'
+          && myMember().data.status == 'approved'
+        );
     }
 
     function isApproved() {
-      return signedIn() && exists(memberPath(request.auth.uid)) && myMember().data.status == 'approved';
+      return signedIn()
+        && exists(memberPath(request.auth.uid))
+        && myMember().data.status == 'approved';
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function safeMemberSelfUpdate(uid) {
+      return isOwner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.nim == resource.data.nim
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'cohort', 'avatar',
+          'level', 'xp', 'xpToNextLevel', 'totalXp', 'coins', 'streak',
+          'currentStage', 'completedCourses', 'completedStages', 'passedStages', 'stageProgress',
+          'badges', 'titles', 'frames', 'avatars',
+          'ownedBadges', 'ownedTitles', 'ownedFrames', 'ownedAvatars',
+          'activeBadge', 'activeTitle', 'activeFrame', 'activeAvatar',
+          'unlockedRewards', 'unopenedChests', 'openedChests', 'chestHistory', 'coinTransactions',
+          'quizHistory', 'activityLogs', 'challengeSubmissions', 'completedChallenges',
+          'challengeRewardHistory', 'lastChallengeReward',
+          'finalQuestComplete', 'certificateCode', 'lastStudyDate',
+          'schemaVersion', 'updatedAt', 'materialBookmarks', 'privateNotes',
+          'ownedShopItems', 'shopInventory', 'shopPurchaseHistory', 'notifications',
+          'activeNameColor', 'activeProfileDecoration',
+          'finalProjectStatus', 'finalProjectSubmissionId', 'finalProjectSubmittedAt',
+          'finalProjectAdminNote', 'finalProjectReviewedAt', 'finalProjectApprovedAt',
+          'certificateStatus', 'certificateIssuedAt', 'certificateRevokedAt'
+        ]);
+    }
+
+
+
+    match /nimIndex/{nim} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.nim == nim
+        && request.resource.data.authEmail == request.auth.token.email;
+      allow update, delete: if isAdmin();
     }
 
     match /members/{uid} {
@@ -28,16 +83,8 @@ service cloud.firestore {
         && request.resource.data.role == 'member'
         && request.resource.data.status == 'pending';
 
-      allow read: if isAdmin() || isApproved() || (signedIn() && request.auth.uid == uid);
-
-      allow update: if isAdmin()
-        || (
-          signedIn()
-          && request.auth.uid == uid
-          && request.resource.data.role == resource.data.role
-          && request.resource.data.status == resource.data.status
-        );
-
+      allow read: if isAdmin() || isApproved() || isOwner(uid);
+      allow update: if isAdmin() || safeMemberSelfUpdate(uid);
       allow delete: if isAdmin();
     }
 
@@ -86,7 +133,10 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
 
     match /challenges/{id} {
       allow read: if true;
@@ -94,10 +144,54 @@ service cloud.firestore {
     }
 
     match /challengeSubmissions/{id} {
-      allow create: if signedIn()
-        && request.resource.data.uid == request.auth.uid;
+      allow create: if isApproved()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.rewardGiven == false;
       allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
       allow update, delete: if isAdmin();
+    }
+
+    match /contentReports/{id} {
+      allow create: if isApproved()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'open';
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+
+
+    match /shopItems/{id} {
+      allow read: if isApproved() || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /finalProjectSubmissions/{id} {
+      allow create: if isApproved()
+        && request.resource.data.uid == request.auth.uid;
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update: if isAdmin() || (isApproved() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /certificateSettings/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /certificates/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /mediaAssets/{id} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /auditLogs/{id} {
+      allow read, write: if isAdmin();
     }
 
     match /activity/{id} {

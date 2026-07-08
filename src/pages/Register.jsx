@@ -7,10 +7,12 @@ import { useToast } from '../context/ToastContext';
 
 const avatars = ['🧑‍💻', '🧙', '🛡️', '🏹', '🤖', '🐱'];
 const LETTING_OPTIONS = ['2022', '2023', '2024', '2025', '2026'];
+
 export default function Register() {
   const [form, setForm] = useState({
     name: '',
     nim: '',
+    email: '',
     cohort: '',
     password: '',
     avatar: avatars[0]
@@ -23,8 +25,15 @@ export default function Register() {
   async function handleSubmit(event) {
     event.preventDefault();
 
+    const cleanEmail = form.email.trim().toLowerCase();
+
     if (!/^\d{6,15}$/.test(form.nim.trim())) {
       showToast('NIM harus berupa angka dengan format rapi.', 'error');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      showToast('Email pemulihan wajib diisi dengan format email yang benar.', 'error');
       return;
     }
 
@@ -36,14 +45,14 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await registerMember(form);
+      await registerMember({ ...form, email: cleanEmail, recoveryEmail: cleanEmail });
       showToast('Pendaftaran berhasil. Akun menunggu persetujuan pengurus.');
       navigate('/pending');
     } catch (error) {
-  console.error('REGISTER ERROR CODE:', error.code);
-  console.error('REGISTER ERROR MESSAGE:', error.message);
-  showToast(`${error.code || 'error'} - ${error.message || 'Pendaftaran gagal.'}`, 'error');
-} finally {
+      console.error('REGISTER ERROR CODE:', error.code);
+      console.error('REGISTER ERROR MESSAGE:', error.message);
+      showToast(error.message || 'Pendaftaran gagal.', 'error');
+    } finally {
       setLoading(false);
     }
   }
@@ -53,7 +62,9 @@ export default function Register() {
       <PixelCard className="auth-card wide-auth">
         <p className="eyebrow">Join Academy</p>
         <h1>Daftar Anggota</h1>
-        <p>Gunakan nama asli. Akses kursus akan terbuka setelah disetujui pengurus.</p>
+        <p>
+          Login tetap memakai NIM, tetapi email pemulihan dipakai sistem untuk reset sandi kalau kamu lupa password.
+        </p>
         <form className="form-grid" onSubmit={handleSubmit}>
           <label>
             Nama asli
@@ -74,22 +85,33 @@ export default function Register() {
               onChange={(event) => setForm({ ...form, nim: event.target.value })}
             />
           </label>
+          <label className="form-full">
+            Email pemulihan
+            <input
+              required
+              type="email"
+              placeholder="Contoh: nama@email.com"
+              value={form.email}
+              onChange={(event) => setForm({ ...form, email: event.target.value })}
+            />
+            <small>Email ini tidak dipakai untuk login harian. Login tetap memakai NIM.</small>
+          </label>
           <label>
             Angkatan
             <select
-            name="cohort"
-            value={form.cohort}
-            onChange={(event) => setForm({...form, cohort: event.target.value })}
-            required
-          >
-            <option value="">Pilih Letting</option>
+              name="cohort"
+              value={form.cohort}
+              onChange={(event) => setForm({...form, cohort: event.target.value })}
+              required
+            >
+              <option value="">Pilih Letting</option>
 
-            {LETTING_OPTIONS.map((year) => (
-              <option key={year} value={year}>
-                Letting {year}
-              </option>
-            ))}
-          </select>
+              {LETTING_OPTIONS.map((year) => (
+                <option key={year} value={year}>
+                  Letting {year}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             Password
@@ -101,7 +123,7 @@ export default function Register() {
               onChange={(event) => setForm({ ...form, password: event.target.value })}
             />
           </label>
-          <div className="avatar-picker">
+          <div className="avatar-picker form-full">
             {avatars.map((avatar) => (
               <button
                 className={form.avatar === avatar ? 'active' : ''}

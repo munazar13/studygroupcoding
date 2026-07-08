@@ -57,6 +57,7 @@ export default function Login() {
           <PixelButton disabled={loading} type="submit">{loading ? 'Memproses...' : 'Masuk'}</PixelButton>
         </form>
         <p className="auth-footer">Belum punya akun? <Link to="/register">Daftar dulu</Link></p>
+        <p className="auth-footer"><Link to="/forgot-password">Lupa password?</Link></p>
       </PixelCard>
     </main>
   );

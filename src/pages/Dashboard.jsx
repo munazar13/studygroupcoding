@@ -23,8 +23,12 @@ export default function Dashboard() {
   }, []);
 
   const nextCourse = useMemo(() => data ? getNextCourse(data.courses, currentMember) : null, [data, currentMember]);
-  const rank = useMemo(() => data ? getRank(data.ranks, currentMember.xp) : null, [data, currentMember]);
-  const completedCount = currentMember.passedStages?.length || 0;
+  const rank = useMemo(() => data ? getRank(data.ranks, currentMember.totalXp || currentMember.xp || 0) : null, [data, currentMember]);
+  const completedCount = new Set([
+    ...(currentMember.passedStages || []),
+    ...(currentMember.completedStages || [])
+  ].map((item) => Number(item))).size;
+  const totalStages = data?.courses?.length || 0;
 
   if (loading || !data) {
     return <LoadingState />;
@@ -48,7 +52,7 @@ export default function Dashboard() {
         <div>
           <p className="eyebrow">Dashboard Anggota</p>
           <h1>{currentMember.avatar} {currentMember.name}</h1>
-          <p>{rank.name} · Stage {currentMember.currentStage || 1}/32</p>
+          <p>{rank.name} · Stage {currentMember.currentStage || 1}/{totalStages || '-'}</p>
           <div className="pixel-progress large">
             <span style={{ width: `${Math.min((currentMember.xp / rank.nextXp) * 100, 100)}%` }} />
           </div>
@@ -58,7 +62,8 @@ export default function Dashboard() {
           <h2>Quest Sekarang</h2>
           {nextCourse ? (
             <>
-              <p>Stage {nextCourse.id}: {nextCourse.title}</p>
+              <p>Stage {nextCourse.stage || nextCourse.order || nextCourse.id}: {nextCourse.title}</p>
+              <p className="dashboard-guidance">Baca materi, tandai paham, lalu kerjakan quiz untuk membuka stage berikutnya.</p>
               <Link className="pixel-button primary" to={`/course/${nextCourse.id}`}>Lanjutkan</Link>
             </>
           ) : data.courses.length ? (
@@ -73,7 +78,7 @@ export default function Dashboard() {
         <StatCard icon="⭐" value={currentMember.xp || 0} label="XP" />
         <StatCard icon="🪙" value={currentMember.coins || 0} label="Koin" />
         <StatCard icon="🔥" value={`${currentMember.streak || 0} hari`} label="Streak" />
-        <StatCard icon="✅" value={`${completedCount}/${data.courses.length || 0}`} label="Stage Selesai" />
+        <StatCard icon="✅" value={`${completedCount}/${totalStages}`} label="Stage Selesai" />
       </section>
 
       <section className="two-column">

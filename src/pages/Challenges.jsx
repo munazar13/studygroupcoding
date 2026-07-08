@@ -123,7 +123,7 @@ export default function Challenges() {
   }, [challenges]);
 
   const selectedChallenge = activeChallenges.find(
-    (challenge) => challenge.id === selectedChallengeId
+    (challenge) => String(challenge.id) === String(selectedChallengeId)
   );
 
   async function handleSubmitChallengeProof(event) {
@@ -180,7 +180,10 @@ export default function Challenges() {
       await updateCurrentMember({
         challengeSubmissions: [
           submissionItem,
-          ...(currentMember.challengeSubmissions || [])
+          ...(currentMember.challengeSubmissions || []).filter((item) => (
+            String(item.challengeId) !== String(selectedChallenge.id) ||
+            item.status === 'approved'
+          ))
         ]
       });
 

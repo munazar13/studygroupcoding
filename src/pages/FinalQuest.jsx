@@ -1,99 +1,170 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import LoadingState from '../components/LoadingState';
 import PixelButton from '../components/PixelButton';
 import PixelCard from '../components/PixelCard';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import finalQuest from '../data/finalQuest.json';
-import { addCoinsToMember, addXpToMember } from '../utils/levelSystem';
+import { loadLearningCatalog, loadMyFinalProjectSubmission, upsertFinalProjectSubmission } from '../services/dataApi';
+
+const emptyForm = {
+  title: '',
+  description: '',
+  demoUrl: '',
+  githubUrl: '',
+  screenshotUrl: '',
+  note: ''
+};
+
+function getStageNumber(course = {}) {
+  return Number(course.stage || course.order || course.id || 0);
+}
+
+function statusLabel(status) {
+  if (status === 'approved') return 'Disetujui';
+  if (status === 'revision') return 'Perlu Revisi';
+  if (status === 'rejected') return 'Ditolak';
+  if (status === 'submitted') return 'Menunggu Review';
+  return 'Belum Dikirim';
+}
 
 export default function FinalQuest() {
-  const { currentMember, updateCurrentMember } = useAuth();
+  const { currentMember, refreshMember } = useAuth();
   const { showToast } = useToast();
-  const [answers, setAnswers] = useState({});
-  const [result, setResult] = useState(null);
-  const unlocked = (currentMember.passedStages || []).length >= 32;
+  const [courses, setCourses] = useState([]);
+  const [submission, setSubmission] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  async function finishQuest() {
-    const correct = finalQuest.reduce((total, item) => Number(answers[item.id]) === Number(item.correctIndex) ? total + 1 : total, 0);
-    const score = Math.round((correct / finalQuest.length) * 100);
-    const passed = score >= 80;
+  useEffect(() => {
+    Promise.all([
+      loadLearningCatalog(),
+      loadMyFinalProjectSubmission(currentMember.uid)
+    ])
+      .then(([catalog, submissionData]) => {
+        setCourses(catalog.courses || []);
+        setSubmission(submissionData);
+        if (submissionData) {
+          setForm({
+            title: submissionData.title || '',
+            description: submissionData.description || '',
+            demoUrl: submissionData.demoUrl || '',
+            githubUrl: submissionData.githubUrl || '',
+            screenshotUrl: submissionData.screenshotUrl || '',
+            note: submissionData.note || ''
+          });
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [currentMember.uid]);
 
-    if (passed) {
-      if (currentMember.finalQuestComplete) {
-        showToast('Final Quest sudah pernah selesai. Sertifikat tetap terbuka, reward tidak diberikan ulang.');
-      } else {
-        let nextMember = addXpToMember(currentMember, 500);
-        nextMember = addCoinsToMember(nextMember, 200);
+  const requiredStages = useMemo(() => courses.map(getStageNumber).filter(Boolean), [courses]);
+  const passedStages = useMemo(() => new Set([...(currentMember.passedStages || []), ...(currentMember.completedStages || [])].map(Number)), [currentMember]);
+  const completedRequired = requiredStages.filter((stage) => passedStages.has(stage));
+  const unlocked = requiredStages.length > 0 && completedRequired.length >= requiredStages.length;
 
-        await updateCurrentMember({
-          level: nextMember.level,
-          xp: nextMember.xp,
-          xpToNextLevel: nextMember.xpToNextLevel,
-          totalXp: nextMember.totalXp,
-          coins: nextMember.coins,
-          finalQuestComplete: true,
-          certificateCode: `SGC-${currentMember.nim}-${Date.now().toString().slice(-6)}`
-        });
-        showToast('Final Quest selesai. Sertifikat terbuka.');
-      }
-    } else {
-      showToast('Nilai belum cukup. Pelajari ulang stage PHP dan MySQL.', 'error');
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+
+    try {
+      const nextSubmission = await upsertFinalProjectSubmission({
+        ...submission,
+        ...form,
+        uid: currentMember.uid,
+        memberName: currentMember.name,
+        nim: currentMember.nim,
+        status: submission?.status === 'revision' ? 'submitted' : 'submitted'
+      });
+      setSubmission(nextSubmission);
+      await refreshMember();
+      showToast('Final Project berhasil dikirim. Tunggu review admin.');
+    } catch (error) {
+      showToast(error.message || 'Gagal mengirim Final Project.', 'error');
+    } finally {
+      setSaving(false);
     }
-
-    setResult({ correct, score, passed });
   }
+
+  if (loading) return <LoadingState />;
 
   if (!unlocked) {
     return (
       <main className="page-shell center-page">
         <PixelCard className="locked-panel">
           <span className="big-icon">🏰</span>
-          <h1>Final Quest Terkunci</h1>
-          <p>Selesaikan semua 32 stage sebelum memasuki misi akhir.</p>
+          <h1>Final Project Terkunci</h1>
+          <p>Selesaikan semua stage dan quiz terlebih dahulu. Progress kamu: {completedRequired.length}/{requiredStages.length || 0} stage.</p>
           <Link className="pixel-button primary" to="/map">Kembali ke Learning Map</Link>
         </PixelCard>
       </main>
     );
   }
 
+  const currentStatus = submission?.status || currentMember.finalProjectStatus || '';
+
   return (
-    <main className="page-shell">
+    <main className="page-shell final-project-page">
       <section className="page-hero compact-hero">
-        <p className="eyebrow">Final Quest</p>
-        <h1>Misi Akhir PHP dan MySQL</h1>
-        <p>Jawab skenario alur backend, database, login, dan CRUD secara otomatis.</p>
+        <p className="eyebrow">Final Project</p>
+        <h1>Tugas Akhir Petualangan Coding</h1>
+        <p>Buat project sederhana sebagai bukti bahwa kamu memahami materi. Admin akan review sebelum sertifikat bisa diterbitkan.</p>
       </section>
 
-      {result ? (
-        <PixelCard className="result-card">
-          <h2>{result.passed ? 'Victory!' : 'Belum Lulus'}</h2>
-          <p>Nilai: {result.score} · Benar {result.correct}/{finalQuest.length}</p>
-          {result.passed ? <Link className="pixel-button primary" to="/certificate">Lihat Sertifikat</Link> : null}
+      <section className="two-column">
+        <PixelCard>
+          <h2>Ketentuan Project</h2>
+          <ul className="clean-list">
+            <li>Buat website sederhana, landing page, profil, katalog UMKM, atau mini app sesuai kemampuan.</li>
+            <li>Project harus bisa dijelaskan: tujuan, fitur, teknologi, dan cara menjalankan.</li>
+            <li>Kirim minimal salah satu bukti: link demo, GitHub, atau screenshot.</li>
+            <li>Jika diminta revisi, perbaiki lalu kirim ulang dari halaman ini.</li>
+          </ul>
         </PixelCard>
-      ) : null}
 
-      <section className="material-list">
-        {finalQuest.map((item) => (
-          <PixelCard className="question-card mini" key={item.id}>
-            <h3>{item.question}</h3>
-            <div className="answer-grid">
-              {item.options.map((option, index) => (
-                <button
-                  className={Number(answers[item.id]) === index ? 'answer-option selected' : 'answer-option'}
-                  key={option}
-                  type="button"
-                  onClick={() => setAnswers({ ...answers, [item.id]: index })}
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </PixelCard>
-        ))}
+        <PixelCard className={`final-status-card ${currentStatus || 'empty'}`}>
+          <p className="eyebrow">Status Review</p>
+          <h2>{statusLabel(currentStatus)}</h2>
+          {submission?.adminNote || currentMember.finalProjectAdminNote ? <p><strong>Catatan admin:</strong> {submission?.adminNote || currentMember.finalProjectAdminNote}</p> : <p>Setelah dikirim, admin akan mengecek project kamu.</p>}
+          {currentStatus === 'approved' ? <Link className="pixel-button primary" to="/certificate">Cek Sertifikat</Link> : null}
+        </PixelCard>
       </section>
 
-      <PixelButton onClick={finishQuest}>Selesaikan Final Quest</PixelButton>
+      {currentStatus === 'approved' ? null : (
+        <PixelCard className="section-block">
+          <h2>{submission ? 'Update Submission Final Project' : 'Kirim Final Project'}</h2>
+          <form className="form-stack" onSubmit={handleSubmit}>
+            <label>
+              Judul Project
+              <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="Contoh: Website Profil Komunitas" />
+            </label>
+            <label>
+              Deskripsi Project
+              <textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} placeholder="Jelaskan tujuan, fitur utama, dan teknologi yang kamu pakai." />
+            </label>
+            <div className="admin-editor-grid compact-grid">
+              <label>
+                Link Demo
+                <input value={form.demoUrl} onChange={(event) => setForm({ ...form, demoUrl: event.target.value })} placeholder="https://..." />
+              </label>
+              <label>
+                Link GitHub
+                <input value={form.githubUrl} onChange={(event) => setForm({ ...form, githubUrl: event.target.value })} placeholder="https://github.com/..." />
+              </label>
+            </div>
+            <label>
+              Link Screenshot / Bukti Gambar
+              <input value={form.screenshotUrl} onChange={(event) => setForm({ ...form, screenshotUrl: event.target.value })} placeholder="https://..." />
+            </label>
+            <label>
+              Catatan untuk Admin
+              <textarea value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} placeholder="Tambahkan kendala, cara login demo, atau catatan khusus." />
+            </label>
+            <PixelButton type="submit" disabled={saving}>{saving ? 'Mengirim...' : 'Kirim Final Project'}</PixelButton>
+          </form>
+        </PixelCard>
+      )}
     </main>
   );
 }

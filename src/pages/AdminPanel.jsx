@@ -6,6 +6,7 @@ import StatCard from '../components/StatCard';
 import AdminPreviewContent from '../components/AdminPreviewContent';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { FIXED_MATERIAL_SECTIONS } from '../data/fixedMaterialSections';
 import {
   approveChallengeSubmission,
   rejectChallengeSubmission,
@@ -24,6 +25,7 @@ import {
   resetMemberProgress,
   resetMemberRewards,
   restoreBackupData,
+  resolveContentReport,
   setMemberStatus,
   updateMemberAdminStats,
   upsertAnnouncement,
@@ -35,7 +37,24 @@ import {
   upsertProject,
   upsertQuestion,
   upsertReward,
-  deleteReward
+  deleteReward,
+  analyzeSystemHealth,
+  deleteMediaAsset,
+  deleteShopItem,
+  exportLearningContent,
+  importLearningContent,
+  issueCertificate,
+  loadCertificateSettings,
+  loadCertificates,
+  loadFinalProjectSubmissions,
+  loadMediaAssets,
+  loadShopItems,
+  repairAllMembersData,
+  reviewFinalProjectSubmission,
+  revokeCertificate,
+  updateCertificateSettings,
+  upsertMediaAsset,
+  upsertShopItem,
 } from '../services/dataApi';
 import { downloadTextFile } from '../utils/download';
 import { RARITY_LIST, getRarityClassName, getRarityLabel } from '../utils/rarity';
@@ -49,6 +68,14 @@ const tabs = [
 { id: 'projects', label: 'Karya' },
 { id: 'challenges', label: 'Tantangan' },
 { id: 'rewards', label: 'Reward' },
+{ id: 'shop', label: 'Shop' },
+{ id: 'health', label: 'Health Check' },
+{ id: 'final-projects', label: 'Final Project' },
+{ id: 'certificates', label: 'Sertifikat' },
+{ id: 'media', label: 'Media' },
+{ id: 'content-tools', label: 'Import/Export Konten' },
+{ id: 'reports', label: 'Laporan' },
+{ id: 'audit', label: 'Audit Log' },
 { id: 'backup', label: 'Backup' }
 ];
 
@@ -88,16 +115,7 @@ const emptyCourse = {
   published: true
 };
 
-const emptySection = {
-  id: '',
-  courseId: '',
-  order: 1,
-  title: '',
-  content: '',
-  code: '',
-  checkpoint: '',
-  published: true
-};
+
 
 const emptyQuestion = {
   id: '',
@@ -181,6 +199,31 @@ const emptyChallenge = {
   order: 1
 };
 
+
+const emptyShopItem = {
+  id: '',
+  type: 'avatar',
+  name: '',
+  icon: '🧙',
+  color: '',
+  rarity: 'common',
+  description: '',
+  price: 25,
+  published: true,
+  order: 999
+};
+
+const emptyCertificateSettings = {
+  programName: 'Dasar Pemrograman, PHP, dan MySQL',
+  organizationName: 'Study Group Coding',
+  signerName: 'Admin Study Group Coding',
+  signerTitle: 'Pengurus / Mentor',
+  requirementText: 'Menyelesaikan semua stage, lulus quiz, dan Final Project disetujui.',
+  logoUrl: './images/logo.svg',
+  signatureUrl: '',
+  stampUrl: ''
+};
+
 const emptyReward = {
   id: '',
   type: 'badge',
@@ -202,6 +245,14 @@ function readImageAsDataUrl(file) {
   });
 }
 
+function confirmDangerAction({ title, message, confirmation = 'DELETE' }) {
+  const response = window.prompt(
+    `${title}\n\n${message}\n\nKetik ${confirmation} untuk melanjutkan.`
+  );
+
+  return response === confirmation;
+}
+
 function questionToForm(question) {
   const options = question.options || [];
 
@@ -221,6 +272,38 @@ function questionToForm(question) {
   };
 }
 
+function getQuestionFormStatus(question, index = 0) {
+  const label = `Soal ${Number(question?.order || index + 1)}`;
+  const options = [
+    question?.optionA,
+    question?.optionB,
+    question?.optionC,
+    question?.optionD
+  ];
+
+  if (!String(question?.question || '').trim()) {
+    return { label, complete: false, published: question?.published === true, message: 'Pertanyaan belum diisi' };
+  }
+
+  if (options.some((option) => !String(option || '').trim())) {
+    return { label, complete: false, published: question?.published === true, message: 'Pilihan A/B/C/D belum lengkap' };
+  }
+
+  if (![0, 1, 2, 3].includes(Number(question?.correctIndex))) {
+    return { label, complete: false, published: question?.published === true, message: 'Jawaban benar belum valid' };
+  }
+
+  if (!String(question?.explanation || '').trim()) {
+    return { label, complete: false, published: question?.published === true, message: 'Pembahasan belum diisi' };
+  }
+
+  if (question?.published === false) {
+    return { label, complete: false, published: false, message: 'Draft' };
+  }
+
+  return { label, complete: true, published: true, message: 'Siap' };
+}
+
 export default function AdminPanel() {
   const { refreshMember } = useAuth();
   const { showToast } = useToast();
@@ -234,10 +317,16 @@ export default function AdminPanel() {
   announcements: []
   });
   const [learningData, setLearningData] = useState({ courses: [], rewards: [], ranks: [], members: [] });
-  const [contentData, setContentData] = useState({ courses: [], courseSections: [], questions: [] });
+  const [contentData, setContentData] = useState({
+    courses: [],
+    courseSections: [],
+    questions: [],
+    contentReports: [],
+    auditLogs: []
+  });
   const [courseForm, setCourseForm] = useState(emptyCourse);
-  const [sectionForm, setSectionForm] = useState(emptySection);
-  const [questionForm, setQuestionForm] = useState(emptyQuestion);
+  const [sectionForms, setSectionForms] = useState([]);
+  const [questionForms, setQuestionForms] = useState([]);
   const [eventForm, setEventForm] = useState(emptyEvent);
   const [announcementForm, setAnnouncementForm] = useState(emptyAnnouncement);
   const [docForm, setDocForm] = useState(emptyDoc);
@@ -245,6 +334,14 @@ export default function AdminPanel() {
   const [challengeData, setChallengeData] = useState({ challenges: [], challengeSubmissions: [] });
   const [challengeForm, setChallengeForm] = useState(emptyChallenge);
   const [rewardForm, setRewardForm] = useState(emptyReward);
+  const [shopItems, setShopItems] = useState([]);
+  const [shopForm, setShopForm] = useState(emptyShopItem);
+  const [finalSubmissions, setFinalSubmissions] = useState([]);
+  const [certificates, setCertificates] = useState([]);
+  const [certificateSettings, setCertificateSettings] = useState(emptyCertificateSettings);
+  const [certificateReviewNotes, setCertificateReviewNotes] = useState({});
+  const [mediaAssets, setMediaAssets] = useState([]);
+  const [mediaForm, setMediaForm] = useState({ title: '', dataUrl: '', fileName: '', mimeType: '', size: 0 });
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [memberEditForm, setMemberEditForm] = useState({
@@ -263,29 +360,50 @@ export default function AdminPanel() {
 
   try {
     const [
-  publicResult,
-  learningResult,
-  contentResult,
-  challengeResult,
-  announcementResult
-] = await Promise.all([
-  loadPublicData(),
-  loadLearningData(),
-  loadAdminContentData(),
-  loadChallengeData(),
-  loadAnnouncements({ includeDrafts: true })
-]);
+      publicResult,
+      learningResult,
+      contentResult,
+      challengeResult,
+      announcementResult,
+      shopResult,
+      finalProjectResult,
+      certificateResult,
+      certificateSettingsResult,
+      mediaResult
+    ] = await Promise.all([
+      loadPublicData(),
+      loadLearningData(),
+      loadAdminContentData(),
+      loadChallengeData(),
+      loadAnnouncements({ includeDrafts: true }),
+      loadShopItems({ includeDrafts: true }),
+      loadFinalProjectSubmissions(),
+      loadCertificates(),
+      loadCertificateSettings(),
+      loadMediaAssets()
+    ]);
 
     setPublicData({
-  ...publicResult,
-  announcements: announcementResult
-});
+      ...publicResult,
+      announcements: announcementResult
+    });
     setLearningData(learningResult);
     setContentData(contentResult);
     setChallengeData(challengeResult);
+    setShopItems(shopResult || []);
+    setFinalSubmissions(finalProjectResult || []);
+    setCertificates(certificateResult || []);
+    setCertificateSettings({ ...emptyCertificateSettings, ...(certificateSettingsResult || {}) });
+    setMediaAssets(mediaResult || []);
   } catch (error) {
     console.error(error);
-    showToast(error.message || 'Gagal memuat data admin.', 'error');
+
+    const message = String(error?.message || '');
+    const permissionMessage = message.toLowerCase().includes('permission')
+      ? 'AdminPanel ditolak Firestore. Deploy firestore.rules terbaru dan pastikan login memakai akun admin.'
+      : message || 'Gagal memuat data admin.';
+
+    showToast(permissionMessage, 'error');
   } finally {
     setLoading(false);
   }
@@ -335,6 +453,33 @@ const filteredMembers = useMemo(() => {
   });
 }, [allMembers, memberSearch, memberStatusFilter, memberCohortFilter]);
 
+const adminAnalytics = useMemo(() => {
+  const quizEntries = allMembers.flatMap((member) => member.quizHistory || []);
+  const averageQuizScore = quizEntries.length
+    ? Math.round(
+        quizEntries.reduce((sum, item) => sum + Number(item.score || 0), 0) / quizEntries.length
+      )
+    : 0;
+
+  return {
+    approvedMembers: allMembers.filter((member) => member.status === 'approved').length,
+    pendingMembers: allMembers.filter((member) => member.status === 'pending').length,
+    publishedStages: contentData.courses.filter((course) => course.published !== false).length,
+    publishedQuestions: contentData.questions.filter((question) => question.published !== false).length,
+    openReports: (contentData.contentReports || []).filter((report) => report.status !== 'resolved').length,
+    pendingChallengeSubmissions: (challengeData.challengeSubmissions || []).filter((submission) => submission.status === 'pending').length,
+    averageQuizScore,
+    quizAttempts: quizEntries.length
+  };
+}, [allMembers, challengeData.challengeSubmissions, contentData.courses, contentData.questions, contentData.contentReports]);
+
+const systemHealth = useMemo(() => analyzeSystemHealth({
+  members: allMembers,
+  courses: contentData.courses,
+  courseSections: contentData.courseSections,
+  questions: contentData.questions
+}), [allMembers, contentData.courses, contentData.courseSections, contentData.questions]);
+
   const sortedCourses = useMemo(() => {
   return [...contentData.courses].sort((a, b) => Number(a.order || a.stage || 0) - Number(b.order || b.stage || 0));
 }, [contentData.courses]);
@@ -346,16 +491,146 @@ const selectedCourse = useMemo(() => {
 }, [sortedCourses, activeCourseId]);
 
 const selectedCourseSections = useMemo(() => {
-  return contentData.courseSections
-    .filter((section) => String(section.courseId) === String(activeCourseId))
-    .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  const existingSections = contentData.courseSections
+    .filter((section) => String(section.courseId) === String(activeCourseId));
+
+  return FIXED_MATERIAL_SECTIONS.map((template) => {
+    const existing = existingSections.find((section) => {
+      const sameType = String(section.type || '') === String(template.type);
+      const sameOrder = Number(section.order || 0) === Number(template.order);
+
+      return sameType || sameOrder;
+    });
+
+    return {
+      id: existing?.id || `section-${activeCourseId}-${template.type}`,
+      courseId: String(activeCourseId || ''),
+      order: template.order,
+      type: template.type,
+      title: template.title,
+      content: existing?.content || '',
+      code: existing?.code || '',
+      checkpoint: existing?.checkpoint || template.defaultCheckpoint,
+      published: existing ? existing.published !== false : false,
+      isEmpty: !existing || !String(existing.content || '').trim()
+    };
+  });
 }, [contentData.courseSections, activeCourseId]);
+
+useEffect(() => {
+  if (!activeCourseId) {
+    setSectionForms([]);
+    return;
+  }
+
+  setSectionForms(
+    selectedCourseSections.map((section) => ({
+      ...section,
+      courseId: String(activeCourseId),
+      content: section.content || '',
+      code: section.code || '',
+      checkpoint: section.checkpoint || '',
+      published: section.published !== false
+    }))
+  );
+}, [activeCourseId, selectedCourseSections]);
 
 const selectedCourseQuestions = useMemo(() => {
   return contentData.questions
     .filter((question) => String(question.courseId) === String(activeCourseId))
     .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
 }, [contentData.questions, activeCourseId]);
+
+useEffect(() => {
+  if (!activeCourseId) {
+    setQuestionForms([]);
+    return;
+  }
+
+  const existingQuestions = selectedCourseQuestions.map((question, index) => ({
+    ...questionToForm(question),
+    courseId: String(activeCourseId),
+    order: question.order || index + 1,
+    published: question.published !== false
+  }));
+
+  setQuestionForms(
+    existingQuestions.length
+      ? existingQuestions
+      : [
+          {
+            ...emptyQuestion,
+            courseId: String(activeCourseId),
+            order: 1,
+            published: true
+          }
+        ]
+  );
+}, [activeCourseId, selectedCourseQuestions]);
+
+const stageCompleteness = useMemo(() => {
+  const materialStatus = selectedCourseSections.map((section) => {
+    const hasContent = String(section.content || '').trim().length > 0;
+    const hasCheckpoint = String(section.checkpoint || '').trim().length > 0;
+
+    if (!hasContent) {
+      return {
+        title: section.title,
+        complete: false,
+        message: 'Belum diisi'
+      };
+    }
+
+    if (!hasCheckpoint) {
+      return {
+        title: section.title,
+        complete: false,
+        message: 'Checkpoint belum diisi'
+      };
+    }
+
+    if (section.published === false) {
+      return {
+        title: section.title,
+        complete: false,
+        message: 'Draft'
+      };
+    }
+
+    return {
+      title: section.title,
+      complete: true,
+      message: 'Lengkap'
+    };
+  });
+
+  const questionStatus = selectedCourseQuestions.map((question, index) =>
+    getQuestionFormStatus(questionToForm(question), index)
+  );
+
+  const readyPublishedQuestions = questionStatus.filter((item) => item.complete);
+  const quizComplete = readyPublishedQuestions.length > 0;
+
+  const xpReward = Number(courseForm?.xpReward || 0);
+  const coinReward = Number(courseForm?.coinReward || 0);
+  const rewardComplete = xpReward > 0 && coinReward > 0;
+
+  const complete =
+    materialStatus.every((item) => item.complete) &&
+    quizComplete &&
+    rewardComplete;
+
+  return {
+    complete,
+    materialStatus,
+    questionStatus,
+    quizComplete,
+    readyQuestionCount: readyPublishedQuestions.length,
+    rewardComplete,
+    xpReward,
+    coinReward
+  };
+}, [selectedCourseSections, selectedCourseQuestions, courseForm?.xpReward, courseForm?.coinReward]);
 
 const masterRewards = useMemo(() => {
   return [...(learningData.rewards || [])].sort((a, b) => {
@@ -526,18 +801,6 @@ chestIcon: selectedCourse.chestIcon || '🎁',
 chestRarity: selectedCourse.chestRarity || 'common',
 published: selectedCourse.published !== false
 });
-
-
-
-setSectionForm((current) => ({
-...current,
-courseId: String(selectedCourse.id || '')
-}));
-
-setQuestionForm((current) => ({
-...current,
-courseId: String(selectedCourse.id || '')
-}));
 }, [activeTab, selectedCourse]);
 
 function createCodeSnippet(language = 'php') {
@@ -552,25 +815,95 @@ function createImageSnippet() {
   return '![Judul gambar](images/materials/nama-file.png)';
 }
 
-function appendToSectionContent(snippet) {
-  setSectionForm((current) => {
-    const oldContent = String(current.content || '').trimEnd();
 
-    return {
+
+function updateQuestionForms(index, field, value) {
+  setQuestionForms((current) =>
+    current.map((question, questionIndex) =>
+      questionIndex === index
+        ? {
+            ...question,
+            [field]: value
+          }
+        : question
+    )
+  );
+}
+
+function appendToQuestionFormFieldAt(index, fieldName, snippet) {
+  setQuestionForms((current) =>
+    current.map((question, questionIndex) => {
+      if (questionIndex !== index) return question;
+
+      const oldContent = String(question[fieldName] || '').trimEnd();
+
+      return {
+        ...question,
+        [fieldName]: oldContent ? `${oldContent}
+
+${snippet}` : snippet
+      };
+    })
+  );
+}
+
+function addQuestionForm() {
+  setQuestionForms((current) => {
+    const nextOrder = current.length
+      ? Math.max(...current.map((question) => Number(question.order || 0))) + 1
+      : 1;
+
+    return [
       ...current,
-      content: oldContent ? `${oldContent}\n\n${snippet}` : snippet
-    };
+      {
+        ...emptyQuestion,
+        id: '',
+        courseId: String(activeCourseId || ''),
+        order: nextOrder,
+        published: true
+      }
+    ];
   });
 }
 
-function appendToQuestionField(fieldName, snippet) {
-  setQuestionForm((current) => {
-    const oldContent = String(current[fieldName] || '').trimEnd();
+async function removeQuestionFormAt(index) {
+  const target = questionForms[index];
 
-    return {
-      ...current,
-      [fieldName]: oldContent ? `${oldContent}\n\n${snippet}` : snippet
-    };
+  if (!target) return;
+
+  const isSaved = selectedCourseQuestions.some(
+    (question) => String(question.id) === String(target.id)
+  );
+
+  if (isSaved) {
+    const confirmed = window.confirm(`Hapus soal nomor ${target.order || index + 1}?`);
+
+    if (!confirmed) return;
+
+    try {
+      await removeRecord('questions', target.id);
+      showToast('Soal berhasil dihapus.');
+      await reload();
+    } catch (error) {
+      showToast(error.message || 'Soal gagal dihapus.', 'error');
+    }
+
+    return;
+  }
+
+  setQuestionForms((current) => {
+    const nextForms = current.filter((_, questionIndex) => questionIndex !== index);
+
+    if (nextForms.length) return nextForms;
+
+    return [
+      {
+        ...emptyQuestion,
+        courseId: String(activeCourseId || ''),
+        order: 1,
+        published: true
+      }
+    ];
   });
 }
 
@@ -645,70 +978,7 @@ function validateCourseForm() {
   return true;
 }
 
-function validateSectionForm() {
-  if (isBlank(sectionForm.courseId || activeCourseId)) {
-    showToast('Pilih stage untuk materi.', 'error');
-    return false;
-  }
 
-  if (isBlank(sectionForm.title)) {
-    showToast('Judul materi wajib diisi.', 'error');
-    return false;
-  }
-
-  if (isBlank(sectionForm.content)) {
-    showToast('Isi materi wajib diisi.', 'error');
-    return false;
-  }
-
-  if (asPositiveNumber(sectionForm.order, 0) < 1) {
-    showToast('Urutan materi minimal 1.', 'error');
-    return false;
-  }
-
-  return true;
-}
-
-function validateQuestionForm() {
-  const options = [
-    questionForm.optionA,
-    questionForm.optionB,
-    questionForm.optionC,
-    questionForm.optionD
-  ];
-
-  if (isBlank(questionForm.courseId || activeCourseId)) {
-    showToast('Pilih stage untuk soal.', 'error');
-    return false;
-  }
-
-  if (asPositiveNumber(questionForm.order, 0) < 1) {
-    showToast('Urutan soal minimal 1.', 'error');
-    return false;
-  }
-
-  if (isBlank(questionForm.question)) {
-    showToast('Pertanyaan wajib diisi.', 'error');
-    return false;
-  }
-
-  if (options.some((option) => isBlank(option))) {
-    showToast('Pilihan A, B, C, dan D wajib diisi.', 'error');
-    return false;
-  }
-
-  if (![0, 1, 2, 3].includes(Number(questionForm.correctIndex))) {
-    showToast('Jawaban benar harus A, B, C, atau D.', 'error');
-    return false;
-  }
-
-  if (isBlank(questionForm.explanation)) {
-    showToast('Pembahasan jawaban wajib diisi.', 'error');
-    return false;
-  }
-
-  return true;
-}
 
 function validateChallengeForm() {
   if (isBlank(challengeForm.title)) {
@@ -825,9 +1095,11 @@ function validateAnnouncementForm() {
   async function handleApprove(member, status) {
   try {
     if (status === 'rejected') {
-      const confirmReject = window.confirm(
-        `Tolak dan hapus data anggota "${member.name}"?`
-      );
+      const confirmReject = confirmDangerAction({
+        title: 'Hapus data anggota',
+        message: `Tolak dan hapus data anggota "${member.name}"? Data yang sudah dihapus tidak bisa dikembalikan kecuali dari backup.`,
+        confirmation: 'DELETE'
+      });
 
       if (!confirmReject) return;
 
@@ -866,9 +1138,11 @@ function validateAnnouncementForm() {
     return;
   }
 
-  const confirmed = window.confirm(
-    `Berikan reward "${reward.name || reward.title || reward.id}" ke "${selectedMember.name}"?`
-  );
+  const confirmed = confirmDangerAction({
+    title: 'Berikan reward manual',
+    message: `Berikan reward "${reward.name || reward.title || reward.id}" ke "${selectedMember.name}"?`,
+    confirmation: 'GIVE'
+  });
 
   if (!confirmed) return;
 
@@ -890,9 +1164,11 @@ async function handleUpdateSelectedMemberStats(event) {
 
   if (!selectedMember) return;
 
-  const confirmed = window.confirm(
-    `Simpan perubahan stat untuk "${selectedMember.name}"?`
-  );
+  const confirmed = confirmDangerAction({
+    title: 'Simpan stat member',
+    message: `Simpan perubahan level, XP, dan koin untuk "${selectedMember.name}"?`,
+    confirmation: 'UPDATE'
+  });
 
   if (!confirmed) return;
 
@@ -911,9 +1187,11 @@ async function handleUpdateSelectedMemberStats(event) {
 async function handleResetSelectedMemberProgress() {
   if (!selectedMember) return;
 
-  const confirmed = window.confirm(
-    `Reset progress belajar "${selectedMember.name}"?\n\nLevel, XP, stage selesai, dan riwayat quiz akan direset.`
-  );
+  const confirmed = confirmDangerAction({
+    title: 'Reset progress member',
+    message: `Reset progress belajar "${selectedMember.name}"? Level, XP, stage selesai, dan riwayat quiz akan direset.`,
+    confirmation: 'RESET'
+  });
 
   if (!confirmed) return;
 
@@ -931,9 +1209,11 @@ async function handleResetSelectedMemberProgress() {
 async function handleResetSelectedMemberRewards() {
   if (!selectedMember) return;
 
-  const confirmed = window.confirm(
-    `Reset semua reward "${selectedMember.name}"?\n\nBadge, title, chest, dan reward aktif akan dihapus.`
-  );
+  const confirmed = confirmDangerAction({
+    title: 'Reset reward member',
+    message: `Reset semua reward "${selectedMember.name}"? Badge, title, chest, dan reward aktif akan dihapus.`,
+    confirmation: 'RESET'
+  });
 
   if (!confirmed) return;
 
@@ -951,9 +1231,11 @@ async function handleResetSelectedMemberRewards() {
 async function handleResetSelectedMemberEconomy() {
   if (!selectedMember) return;
 
-  const confirmed = window.confirm(
-    `Reset koin "${selectedMember.name}"?\n\nSaldo koin dan riwayat transaksi akan dihapus.`
-  );
+  const confirmed = confirmDangerAction({
+    title: 'Reset ekonomi member',
+    message: `Reset koin "${selectedMember.name}"? Saldo koin dan riwayat transaksi akan dihapus.`,
+    confirmation: 'RESET'
+  });
 
   if (!confirmed) return;
 
@@ -971,9 +1253,11 @@ async function handleResetSelectedMemberEconomy() {
 async function handleResetSelectedMemberChallenges() {
   if (!selectedMember) return;
 
-  const confirmed = window.confirm(
-    `Reset data tantangan "${selectedMember.name}"?\n\nSubmission dan challenge selesai akan dikosongkan.`
-  );
+  const confirmed = confirmDangerAction({
+    title: 'Reset tantangan member',
+    message: `Reset data tantangan "${selectedMember.name}"? Submission dan challenge selesai akan dikosongkan.`,
+    confirmation: 'RESET'
+  });
 
   if (!confirmed) return;
 
@@ -991,9 +1275,11 @@ async function handleResetSelectedMemberChallenges() {
 async function handleCleanSelectedMemberData() {
   if (!selectedMember) return;
 
-  const confirmed = window.confirm(
-    `Bersihkan data "${selectedMember.name}"?\n\nDuplikat reward/stage akan dibersihkan dan angka negatif diperbaiki.`
-  );
+  const confirmed = confirmDangerAction({
+    title: 'Bersihkan data member',
+    message: `Bersihkan data "${selectedMember.name}"? Duplikat reward/stage akan dibersihkan dan angka negatif diperbaiki.`,
+    confirmation: 'CLEAN'
+  });
 
   if (!confirmed) return;
 
@@ -1009,13 +1295,51 @@ async function handleCleanSelectedMemberData() {
 }
 
   async function handleCourseSubmit(event) {
-  event.preventDefault();
+    event.preventDefault();
 
-  if (!validateCourseForm()) return;
+    if (!validateCourseForm()) return;
 
-  try {
-      const id = String(courseForm.id || courseForm.stage || courseForm.order);
-      await upsertCourse({ ...courseForm, id });
+    const id = String(courseForm.id || courseForm.stage || courseForm.order);
+    const wantsPublish = courseForm.published === true;
+
+    if (wantsPublish) {
+      const incompleteMaterials = stageCompleteness.materialStatus.filter(
+        (item) => !item.complete
+      );
+
+      const hasQuiz = stageCompleteness.quizComplete;
+
+      const xpReward = Number(courseForm.xpReward || 0);
+      const coinReward = Number(courseForm.coinReward || 0);
+      const hasReward = xpReward > 0 && coinReward > 0;
+
+      if (incompleteMaterials.length > 0) {
+        const firstProblem = incompleteMaterials[0];
+
+        showToast(
+          `Stage belum bisa dipublish. Periksa bagian: ${firstProblem.title} (${firstProblem.message}).`,
+          'error'
+        );
+        return;
+      }
+
+      if (!hasQuiz) {
+        showToast('Stage belum bisa dipublish. Minimal harus ada 1 soal quiz yang lengkap dan published.', 'error');
+        return;
+      }
+
+      if (!hasReward) {
+        showToast('Stage belum bisa dipublish. XP dan coin wajib diisi.', 'error');
+        return;
+      }
+    }
+
+    try {
+      await upsertCourse({
+        ...courseForm,
+        id
+      });
+
       setCourseForm(emptyCourse);
       showToast('Roadmap stage berhasil disimpan.');
       await reload();
@@ -1024,49 +1348,151 @@ async function handleCleanSelectedMemberData() {
     }
   }
 
-  async function handleSectionSubmit(event) {
+  function updateSectionForms(index, field, value) {
+  setSectionForms((current) =>
+    current.map((section, sectionIndex) =>
+      sectionIndex === index
+        ? {
+            ...section,
+            [field]: value
+          }
+        : section
+    )
+  );
+}
+
+function appendToSectionContentAt(index, snippet) {
+  setSectionForms((current) =>
+    current.map((section, sectionIndex) => {
+      if (sectionIndex !== index) return section;
+
+      return {
+        ...section,
+        content: `${section.content ? `${section.content}\n\n` : ''}${snippet}`
+      };
+    })
+  );
+}
+
+async function handleAllSectionsSubmit(event) {
   event.preventDefault();
 
-  if (!validateSectionForm()) return;
+  if (!activeCourseId) {
+    showToast('Pilih stage terlebih dahulu.', 'error');
+    return;
+  }
 
-  try {
-      await upsertCourseSection({
-        ...sectionForm,
-        id: sectionForm.id || `section-${sectionForm.courseId}-${Date.now()}`
-      });
-      setSectionForm(emptySection);
-      showToast('Materi berhasil disimpan.');
-      await reload();
-    } catch (error) {
-      showToast(error.message || 'Materi gagal disimpan.', 'error');
+  if (sectionForms.length !== FIXED_MATERIAL_SECTIONS.length) {
+    showToast('Struktur materi belum lengkap. Muat ulang halaman lalu coba lagi.', 'error');
+    return;
+  }
+
+  for (const section of sectionForms) {
+    if (isBlank(section.content)) {
+      showToast(`Isi materi "${section.title}" wajib diisi.`, 'error');
+      return;
+    }
+
+    if (isBlank(section.checkpoint)) {
+      showToast(`Checkpoint "${section.title}" wajib diisi.`, 'error');
+      return;
     }
   }
 
-  async function handleQuestionSubmit(event) {
-  event.preventDefault();
-
-  if (!validateQuestionForm()) return;
-
   try {
-    const courseId = String(questionForm.courseId || activeCourseId);
+    const courseId = String(activeCourseId);
 
-    await upsertQuestion({
-      ...questionForm,
-      id: questionForm.id || `question-${courseId}-${Date.now()}`,
-      courseId,
-      correctIndex: Number(questionForm.correctIndex || 0)
-    });
+    await Promise.all(
+      sectionForms.map((section) => {
+        const template = FIXED_MATERIAL_SECTIONS.find(
+          (item) => item.type === section.type
+        );
 
-    setQuestionForm({
-      ...emptyQuestion,
-      courseId,
-      order: selectedCourseQuestions.length + 1
-    });
+        if (!template) {
+          throw new Error(`Struktur materi "${section.title}" tidak valid.`);
+        }
 
-    showToast('Soal berhasil disimpan.');
+        return upsertCourseSection({
+          ...section,
+          id: `section-${courseId}-${template.type}`,
+          courseId,
+          order: template.order,
+          type: template.type,
+          title: template.title,
+          code: '',
+          checkpoint: section.checkpoint || template.defaultCheckpoint,
+          published: section.published === true
+        });
+      })
+    );
+
+    showToast('Semua materi berhasil disimpan.');
     await reload();
   } catch (error) {
-    showToast(error.message || 'Soal gagal disimpan.', 'error');
+    showToast(error.message || 'Gagal menyimpan semua materi.', 'error');
+  }
+}
+
+
+async function handleAllQuestionsSubmit(event) {
+  event.preventDefault();
+
+  if (!activeCourseId) {
+    showToast('Pilih stage terlebih dahulu.', 'error');
+    return;
+  }
+
+  if (!questionForms.length) {
+    showToast('Minimal buat 1 soal quiz.', 'error');
+    return;
+  }
+
+  for (const [index, question] of questionForms.entries()) {
+    const label = `Soal ${index + 1}`;
+
+    if (isBlank(question.question)) {
+      showToast(`${label}: pertanyaan wajib diisi.`, 'error');
+      return;
+    }
+
+    const options = [question.optionA, question.optionB, question.optionC, question.optionD];
+
+    if (options.some((option) => isBlank(option))) {
+      showToast(`${label}: pilihan A, B, C, dan D wajib diisi.`, 'error');
+      return;
+    }
+
+    if (![0, 1, 2, 3].includes(Number(question.correctIndex))) {
+      showToast(`${label}: jawaban benar harus A, B, C, atau D.`, 'error');
+      return;
+    }
+
+    if (isBlank(question.explanation)) {
+      showToast(`${label}: pembahasan jawaban wajib diisi.`, 'error');
+      return;
+    }
+  }
+
+  try {
+    const courseId = String(activeCourseId);
+
+    await Promise.all(
+      questionForms.map((question, index) =>
+        upsertQuestion({
+          ...question,
+          id: question.id || `question-${courseId}-${Date.now()}-${index + 1}`,
+          courseId,
+          order: index + 1,
+          correctIndex: Number(question.correctIndex || 0),
+          published: question.published === true
+        })
+      )
+    );
+
+    showToast('Semua soal berhasil disimpan.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal menyimpan semua soal.', 'error');
   }
 }
 
@@ -1208,7 +1634,11 @@ function handleEditReward(reward) {
 }
 
 async function handleDeleteReward(rewardId) {
-  const confirmed = window.confirm('Yakin ingin menghapus reward ini?');
+  const confirmed = confirmDangerAction({
+    title: 'Hapus reward',
+    message: 'Reward akan dihapus dari master reward. Pastikan tidak sedang dipakai di stage aktif.',
+    confirmation: 'DELETE'
+  });
 
   if (!confirmed) return;
 
@@ -1261,9 +1691,11 @@ function formatSubmissionDate(date) {
 }
 
 async function handleApproveChallengeSubmission(submission) {
-  const ok = window.confirm(
-    `Approve submission dari ${submission.memberName || 'anggota'}?\n\nReward akan langsung diberikan.`
-  );
+  const ok = confirmDangerAction({
+    title: 'Approve submission',
+    message: `Approve submission dari ${submission.memberName || 'anggota'}? Reward akan langsung diberikan.`,
+    confirmation: 'APPROVE'
+  });
 
   if (!ok) return;
 
@@ -1294,6 +1726,237 @@ async function handleRejectChallengeSubmission(submission) {
   }
 }
 
+async function handleResolveContentReport(report, status = 'resolved') {
+  if (!report?.id) return;
+
+  try {
+    await resolveContentReport(report.id, status);
+    showToast(status === 'resolved' ? 'Laporan ditandai selesai.' : 'Status laporan diperbarui.');
+    await reload();
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal memperbarui laporan.', 'error');
+  }
+}
+
+
+async function handleShopSubmit(event) {
+  event.preventDefault();
+
+  try {
+    await upsertShopItem(shopForm);
+    setShopForm(emptyShopItem);
+    showToast('Item shop berhasil disimpan.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Item shop gagal disimpan.', 'error');
+  }
+}
+
+function handleEditShopItem(item) {
+  setShopForm({
+    id: item.id || '',
+    type: item.type || 'avatar',
+    name: item.name || item.title || '',
+    icon: item.icon || '🧙',
+    color: item.color || '',
+    rarity: item.rarity || 'common',
+    description: item.description || '',
+    price: Number(item.price || 0),
+    published: item.published !== false,
+    order: Number(item.order || 999)
+  });
+  setActiveTab('shop');
+}
+
+async function handleDeleteShopItem(itemId) {
+  const confirmed = confirmDangerAction({
+    title: 'Hapus item shop',
+    message: `Item shop ${itemId} akan dihapus dari toko.`,
+    confirmation: 'DELETE'
+  });
+
+  if (!confirmed) return;
+
+  try {
+    await deleteShopItem(itemId);
+    showToast('Item shop berhasil dihapus.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal menghapus item shop.', 'error');
+  }
+}
+
+async function handleReviewFinalProject(submission, status) {
+  const note = certificateReviewNotes[submission.id] || '';
+
+  try {
+    await reviewFinalProjectSubmission(submission, status, note);
+    showToast(`Final Project ditandai ${status}.`);
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal review Final Project.', 'error');
+  }
+}
+
+async function handleCertificateSettingsSubmit(event) {
+  event.preventDefault();
+
+  try {
+    const nextSettings = await updateCertificateSettings(certificateSettings);
+    setCertificateSettings(nextSettings);
+    showToast('Pengaturan sertifikat disimpan.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal menyimpan pengaturan sertifikat.', 'error');
+  }
+}
+
+async function handleIssueCertificate(member) {
+  const confirmed = confirmDangerAction({
+    title: 'Terbitkan sertifikat',
+    message: `Terbitkan sertifikat untuk ${member.name}? Pastikan Final Project sudah benar-benar approved.`,
+    confirmation: 'APPROVE'
+  });
+
+  if (!confirmed) return;
+
+  try {
+    await issueCertificate(member, certificateSettings);
+    showToast('Sertifikat berhasil diterbitkan.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal menerbitkan sertifikat.', 'error');
+  }
+}
+
+async function handleRevokeCertificate(certificate) {
+  const reason = window.prompt('Alasan revoke sertifikat:', 'Data perlu diperbaiki');
+  if (reason === null) return;
+
+  const confirmed = confirmDangerAction({
+    title: 'Revoke sertifikat',
+    message: `Batalkan sertifikat ${certificate.code || certificate.id}?`,
+    confirmation: 'DELETE'
+  });
+
+  if (!confirmed) return;
+
+  try {
+    await revokeCertificate(certificate, reason);
+    showToast('Sertifikat berhasil dibatalkan.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal revoke sertifikat.', 'error');
+  }
+}
+
+async function handleRepairAllMembers() {
+  const confirmed = confirmDangerAction({
+    title: 'Perbaiki data lama',
+    message: 'Sistem akan membersihkan field member lama, menghapus duplikat reward, dan menambahkan default field aman.',
+    confirmation: 'CLEAN'
+  });
+
+  if (!confirmed) return;
+
+  try {
+    const count = await repairAllMembersData(allMembers);
+    showToast(`${count} data member diproses.`);
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal memperbaiki data member.', 'error');
+  }
+}
+
+async function handleExportLearningContent() {
+  const content = await exportLearningContent();
+  downloadTextFile('study-group-coding-learning-content.json', content);
+  showToast('Konten belajar berhasil diexport.');
+}
+
+async function handleImportLearningContent(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const confirmed = confirmDangerAction({
+    title: 'Import konten belajar',
+    message: 'Data courses, courseSections, dan questions dengan ID sama akan ditimpa.',
+    confirmation: 'RESTORE'
+  });
+
+  if (!confirmed) {
+    event.target.value = '';
+    return;
+  }
+
+  try {
+    const text = await file.text();
+    const count = await importLearningContent(text);
+    showToast(`${count} dokumen konten berhasil diimport.`);
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Import konten gagal.', 'error');
+  } finally {
+    event.target.value = '';
+  }
+}
+
+async function handleMediaFileUpload(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith('image/')) {
+    showToast('Media manager saat ini hanya menerima gambar.', 'error');
+    return;
+  }
+
+  if (file.size > 750000) {
+    showToast('Ukuran gambar maksimal 750 KB.', 'error');
+    return;
+  }
+
+  const dataUrl = await readImageAsDataUrl(file);
+  setMediaForm({
+    title: mediaForm.title || file.name.replace(/\.[^.]+$/, ''),
+    dataUrl,
+    fileName: file.name,
+    mimeType: file.type,
+    size: file.size
+  });
+}
+
+async function handleMediaSubmit(event) {
+  event.preventDefault();
+
+  try {
+    await upsertMediaAsset(mediaForm);
+    setMediaForm({ title: '', dataUrl: '', fileName: '', mimeType: '', size: 0 });
+    showToast('Media berhasil disimpan.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal menyimpan media.', 'error');
+  }
+}
+
+async function handleDeleteMedia(assetId) {
+  const confirmed = confirmDangerAction({
+    title: 'Hapus media',
+    message: 'Media yang tersimpan di manager akan dihapus.',
+    confirmation: 'DELETE'
+  });
+
+  if (!confirmed) return;
+
+  try {
+    await deleteMediaAsset(assetId);
+    showToast('Media berhasil dihapus.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal menghapus media.', 'error');
+  }
+}
+
   async function handleImageUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1310,7 +1973,13 @@ async function handleRejectChallengeSubmission(submission) {
   }
 
   async function handleDelete(collectionName, id) {
-    if (!window.confirm('Yakin ingin menghapus data ini?')) {
+    const confirmed = confirmDangerAction({
+      title: 'Hapus data',
+      message: `Data ${collectionName}/${id} akan dihapus permanen dari koleksi.`,
+      confirmation: 'DELETE'
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -1329,9 +1998,11 @@ async function handleRejectChallengeSubmission(submission) {
 
   if (!file) return;
 
-  const confirmed = window.confirm(
-    'Restore backup JSON?\n\nData dengan ID yang sama akan ditimpa oleh isi backup. Pastikan file backup benar.'
-  );
+  const confirmed = confirmDangerAction({
+    title: 'Restore backup JSON',
+    message: 'Data dengan ID yang sama akan ditimpa oleh isi backup. Pastikan file backup benar dan sudah membuat backup terbaru sebelum restore.',
+    confirmation: 'RESTORE'
+  });
 
   if (!confirmed) {
     event.target.value = '';
@@ -1391,6 +2062,9 @@ async function handleRejectChallengeSubmission(submission) {
               <li>{contentData.courses.length} stage roadmap dibuat.</li>
               <li>{contentData.courseSections.length} bagian materi dibuat.</li>
               <li>{contentData.questions.length} soal quiz dibuat.</li>
+              <li>{adminAnalytics.openReports} laporan materi/soal masih terbuka.</li>
+              <li>{adminAnalytics.pendingChallengeSubmissions} submission challenge menunggu review.</li>
+              <li>Rata-rata nilai quiz: {adminAnalytics.averageQuizScore || 0} dari {adminAnalytics.quizAttempts} attempt.</li>
             </ul>
           </PixelCard>
         </section>
@@ -2330,450 +3004,503 @@ async function handleRejectChallengeSubmission(submission) {
 
             
 
-            <div className="content-editor-section">
+  <div className="content-editor-section">
   <div className="section-title-row">
     <h3>Materi Stage Ini</h3>
     <span>{selectedCourseSections.length} materi</span>
   </div>
+  <div className="stage-completeness-card">
+  <div className="section-title-row">
+    <h4>Status Kelengkapan Stage</h4>
+    <span>
+      {stageCompleteness.complete ? 'Siap publish' : 'Belum lengkap'}
+    </span>
+  </div>
 
-  <form className="form-stack" onSubmit={handleSectionSubmit}>
-    <input
-      min="1"
-      type="number"
-      placeholder="Urutan materi"
-      value={sectionForm.order}
-      onChange={(e) => setSectionForm({ ...sectionForm, order: e.target.value })}
-    />
-
-    <input
-      required
-      placeholder="Judul materi"
-      value={sectionForm.title}
-      onChange={(e) => setSectionForm({ ...sectionForm, title: e.target.value })}
-    />
-
-    <textarea
-      className="large-textarea"
-      required
-      placeholder="Isi materi. Pisahkan paragraf dengan enter."
-      value={sectionForm.content}
-      onChange={(e) => setSectionForm({ ...sectionForm, content: e.target.value })}
-    />
-
-    <div className="admin-insert-toolbar">
-      <button
-        type="button"
-        onClick={() => appendToSectionContent(createCodeSnippet('php'))}
+  <div className="stage-completeness-list">
+    {stageCompleteness.materialStatus.map((item) => (
+      <div
+        className={`stage-completeness-item ${item.complete ? 'is-complete' : 'is-warning'}`}
+        key={item.title}
       >
-        + Kode PHP
+        <span>{item.complete ? '✓' : '!'}</span>
+        <p>
+          <strong>{item.title}</strong>
+          <small>{item.message}</small>
+        </p>
+      </div>
+    ))}
+
+    <div
+      className={`stage-completeness-item ${stageCompleteness.quizComplete ? 'is-complete' : 'is-warning'}`}
+    >
+      <span>{stageCompleteness.quizComplete ? '✓' : '!'}</span>
+      <p>
+        <strong>Quiz</strong>
+        <small>
+          {stageCompleteness.quizComplete
+            ? `${stageCompleteness.readyQuestionCount} soal siap publish`
+            : 'Belum ada soal lengkap dan published'}
+        </small>
+      </p>
+    </div>
+
+    {stageCompleteness.questionStatus.slice(0, 5).map((item) => (
+      <div
+        className={`stage-completeness-item ${item.complete ? 'is-complete' : 'is-warning'}`}
+        key={`quiz-status-${item.label}`}
+      >
+        <span>{item.complete ? '✓' : '!'}</span>
+        <p>
+          <strong>{item.label}</strong>
+          <small>{item.message}</small>
+        </p>
+      </div>
+    ))}
+
+    {stageCompleteness.questionStatus.length > 5 ? (
+      <div className="stage-completeness-item is-warning">
+        <span>…</span>
+        <p>
+          <strong>Soal lainnya</strong>
+          <small>{stageCompleteness.questionStatus.length - 5} soal lain disembunyikan di ringkasan</small>
+        </p>
+      </div>
+    ) : null}
+
+    <div
+          className={`stage-completeness-item ${stageCompleteness.rewardComplete ? 'is-complete' : 'is-warning'}`}
+        >
+          <span>{stageCompleteness.rewardComplete ? '✓' : '!'}</span>
+          <p>
+            <strong>Reward</strong>
+            <small>
+              {stageCompleteness.rewardComplete
+                ? `${stageCompleteness.xpReward} XP + ${stageCompleteness.coinReward} coin`
+                : 'XP dan coin belum lengkap'}
+            </small>
+          </p>
+        </div>
+      </div>
+    </div>
+
+  <details className="admin-stage-preview-card">
+    <summary>Preview ringkas stage sebagai siswa</summary>
+
+    <div className="admin-stage-preview-content">
+      {sectionForms.map((section) => (
+        <div className="admin-stage-preview-section" key={`preview-${section.type || section.id}`}>
+          <p className="eyebrow">Materi {section.order}/6</p>
+          <h3>{section.title}</h3>
+          <AdminPreviewContent
+            content={section.content}
+            prefix={`student-preview-${section.type}`}
+          />
+          {section.checkpoint ? (
+            <div className="checkpoint">
+              <strong>Checkpoint</strong>
+              <p>{section.checkpoint}</p>
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  </details>
+
+  <form className="form-stack" onSubmit={handleAllSectionsSubmit}>
+  <p className="form-help">
+    Semua stage memiliki 6 bagian materi tetap. Edit seluruh bagian di bawah ini, lalu klik Simpan Semua Materi.
+  </p>
+
+  {sectionForms.map((section, index) => (
+    <div className="material-bulk-editor" key={section.type || section.id}>
+      <div className="fixed-material-header">
+        <span>Materi {section.order}/6</span>
+        <h3>{section.title}</h3>
+      </div>
+
+      <textarea
+        className="large-textarea"
+        required
+        placeholder={`Isi ${section.title}. Pisahkan paragraf dengan enter.`}
+        value={section.content}
+        onChange={(e) => updateSectionForms(index, 'content', e.target.value)}
+      />
+
+      <div className="admin-insert-toolbar">
+        <button
+          type="button"
+          onClick={() => appendToSectionContentAt(index, createCodeSnippet('php'))}
+        >
+          + Kode PHP
         </button>
 
         <button
           type="button"
-          onClick={() => appendToSectionContent(createCodeSnippet('html'))}
+          onClick={() => appendToSectionContentAt(index, createCodeSnippet('html'))}
         >
           + Kode HTML
         </button>
 
         <button
           type="button"
-          onClick={() => appendToSectionContent(createCodeSnippet('css'))}
+          onClick={() => appendToSectionContentAt(index, createCodeSnippet('css'))}
         >
           + Kode CSS
         </button>
 
         <button
           type="button"
-          onClick={() => appendToSectionContent(createCodeSnippet('js'))}
+          onClick={() => appendToSectionContentAt(index, createCodeSnippet('js'))}
         >
           + Kode JS
         </button>
 
         <button
           type="button"
-          onClick={() => appendToSectionContent(createImageSnippet())}
+          onClick={() => appendToSectionContentAt(index, createImageSnippet())}
         >
           + Gambar
         </button>
       </div>
 
-    <div className="admin-preview-box">
-      <div className="section-title-row">
-        <h4>Preview Materi</h4>
-        <span>Code / gambar / paragraf</span>
+      <div className="admin-preview-box">
+        <div className="section-title-row">
+          <h4>Preview Materi</h4>
+          <span>{section.title}</span>
+        </div>
+
+        <div className="admin-preview-content">
+          <AdminPreviewContent
+            content={section.content}
+            prefix={`material-preview-${section.type}`}
+          />
+        </div>
       </div>
 
-      <div className="admin-preview-content">
-        <AdminPreviewContent content={sectionForm.content} prefix="material-preview" />
-      </div>
-    </div>
-
-    <textarea
-      placeholder="Contoh kode, opsional"
-      value={sectionForm.code}
-      onChange={(e) => setSectionForm({ ...sectionForm, code: e.target.value })}
-    />
-
-    <input
-      placeholder="Checkpoint / ringkasan kecil"
-      value={sectionForm.checkpoint}
-      onChange={(e) => setSectionForm({ ...sectionForm, checkpoint: e.target.value })}
-    />
-
-    <label className="check-line">
-      <input
-        type="checkbox"
-        checked={sectionForm.published}
-        onChange={(e) => setSectionForm({ ...sectionForm, published: e.target.checked })}
+      <textarea
+        required
+        placeholder="Checkpoint / ringkasan kecil sebelum lanjut"
+        value={section.checkpoint}
+        onChange={(e) => updateSectionForms(index, 'checkpoint', e.target.value)}
       />
-      Publish materi
-    </label>
 
-    <div className="member-actions">
-      <PixelButton
-        type="submit"
-        onClick={() => setSectionForm((current) => ({
-          ...current,
-          courseId: String(activeCourseId)
-        }))}
-      >
-        Simpan Materi
-      </PixelButton>
-
-      <PixelButton
-        type="button"
-        variant="secondary"
-        onClick={() => setSectionForm({
-          ...emptySection,
-          courseId: String(activeCourseId),
-          order: selectedCourseSections.length + 1
-        })}
-      >
-        Materi Baru
-      </PixelButton>
+      <label className="check-line">
+        <input
+          type="checkbox"
+          checked={section.published}
+          onChange={(e) => updateSectionForms(index, 'published', e.target.checked)}
+        />
+        Publish materi ini
+      </label>
     </div>
-  </form>
+  ))}
+
+  <div className="member-actions">
+    <PixelButton type="submit">
+      Simpan Semua Materi
+    </PixelButton>
+  </div>
+</form>
 
   <div className="admin-list compact-list">
-    {selectedCourseSections.length ? selectedCourseSections.map((section) => (
-      <div className="editor-card" key={section.id}>
+  {selectedCourseSections.map((section) => {
+    const sectionStatus = section.isEmpty
+      ? 'Belum diisi'
+      : section.published
+        ? 'Published'
+        : 'Draft';
+
+    return (
+      <div
+        className={`editor-card material-status-card ${
+          section.isEmpty
+            ? 'is-empty'
+            : section.published
+              ? 'is-published'
+              : 'is-draft'
+        }`}
+        key={section.id}
+      >
         <div>
           <strong>{section.order}. {section.title}</strong>
-          <p>{section.published ? 'Published' : 'Draft'}</p>
-        </div>
-
-        <div className="member-actions">
-          <PixelButton
-            type="button"
-            variant="secondary"
-            onClick={() => setSectionForm({
-              ...emptySection,
-              ...section,
-              courseId: String(activeCourseId),
-              published: section.published !== false
-            })}
-          >
-            Edit
-          </PixelButton>
-
-          <PixelButton
-            type="button"
-            variant="danger"
-            onClick={() => handleDelete('courseSections', section.id)}
-          >
-            Hapus
-          </PixelButton>
+          <p>{sectionStatus}</p>
         </div>
       </div>
-    )) : (
-      <p>Belum ada materi untuk stage ini. Tulis materi pertama lewat form di atas.</p>
-    )}
-  </div>
+    );
+  })}
+</div>
 </div>
 <div className="content-editor-section">
   <div className="section-title-row">
     <h3>Soal Stage Ini</h3>
-    <span>{selectedCourseQuestions.length} soal</span>
+    <span>{questionForms.length} soal di form</span>
   </div>
 
-  <form className="form-stack" onSubmit={handleQuestionSubmit}>
-    <input
-      min="1"
-      type="number"
-      placeholder="Urutan soal"
-      value={questionForm.order}
-      onChange={(e) => setQuestionForm({ ...questionForm, order: e.target.value })}
-    />
+  <form className="form-stack" onSubmit={handleAllQuestionsSubmit}>
+    <p className="form-help">
+      Edit semua soal quiz stage ini sekaligus. Tambah soal jika perlu, lalu klik Simpan Semua Soal.
+    </p>
 
-    <textarea
-      required
-      placeholder="Pertanyaan"
-      value={questionForm.question}
-      onChange={(e) => setQuestionForm({ ...questionForm, question: e.target.value })}
-    />
+    {questionForms.map((question, index) => (
+      <div className="material-bulk-editor question-bulk-editor" key={question.id || `new-question-${index}`}>
+        <div className="fixed-material-header">
+          <span>Soal {index + 1}</span>
+          <h3>{question.question ? `Quiz ${index + 1}` : 'Soal Baru'}</h3>
+        </div>
 
-    <div className="admin-insert-toolbar">
-      <button
-        type="button"
-        onClick={() => appendToQuestionField('question', createCodeSnippet('php'))}
-      >
-        + Kode PHP
-      </button>
+        <div className="question-order-note">
+          Urutan otomatis: Soal {index + 1}
+        </div>
 
-      <button
-        type="button"
-        onClick={() => appendToQuestionField('question', createCodeSnippet('html'))}
-      >
-        + Kode HTML
-      </button>
+        <textarea
+          required
+          className="large-textarea"
+          placeholder="Pertanyaan"
+          value={question.question}
+          onChange={(e) => updateQuestionForms(index, 'question', e.target.value)}
+        />
 
-      <button
-        type="button"
-        onClick={() => appendToQuestionField('question', createCodeSnippet('js'))}
-      >
-        + Kode JS
-      </button>
+        <div className="admin-insert-toolbar">
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'question', createCodeSnippet('php'))}
+          >
+            + Kode PHP
+          </button>
 
-      <button
-        type="button"
-        onClick={() => appendToQuestionField('question', createImageSnippet())}
-      >
-        + Gambar
-      </button>
-    </div>
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'question', createCodeSnippet('html'))}
+          >
+            + Kode HTML
+          </button>
 
-    <div className="admin-preview-box">
-      <div className="section-title-row">
-        <h4>Preview Pertanyaan</h4>
-        <span>Soal</span>
-      </div>
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'question', createCodeSnippet('js'))}
+          >
+            + Kode JS
+          </button>
 
-      <div className="admin-preview-content">
-        <AdminPreviewContent content={questionForm.question} prefix="question-preview" />
-      </div>
-    </div>
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'question', createImageSnippet())}
+          >
+            + Gambar
+          </button>
+        </div>
 
-    <div className="form-row">
-      <textarea
-        required
-        placeholder="Pilihan A"
-        value={questionForm.optionA}
-        onChange={(e) => setQuestionForm({ ...questionForm, optionA: e.target.value })}
-      />
-      <button
-        className="mini-insert-button"
-        type="button"
-        onClick={() => appendToQuestionField('optionA', createCodeSnippet('txt'))}
-      >
-        + Kode ke A
-      </button>
+        <div className="admin-preview-box">
+          <div className="section-title-row">
+            <h4>Preview Pertanyaan</h4>
+            <span>Soal {index + 1}</span>
+          </div>
 
-      <textarea
-        required
-        placeholder="Pilihan B"
-        value={questionForm.optionB}
-        onChange={(e) => setQuestionForm({ ...questionForm, optionB: e.target.value })}
-      />
-      <button
-        className="mini-insert-button"
-        type="button"
-        onClick={() => appendToQuestionField('optionB', createCodeSnippet('txt'))}
-      >
-        + Kode ke B
-      </button>
-    </div>
-
-    <div className="form-row">
-      <textarea
-        required
-        placeholder="Pilihan C"
-        value={questionForm.optionC}
-        onChange={(e) => setQuestionForm({ ...questionForm, optionC: e.target.value })}
-      />
-      <button
-        className="mini-insert-button"
-        type="button"
-        onClick={() => appendToQuestionField('optionC', createCodeSnippet('txt'))}
-      >
-        + Kode ke C
-      </button>
-
-      <textarea
-        required
-        placeholder="Pilihan D"
-        value={questionForm.optionD}
-        onChange={(e) => setQuestionForm({ ...questionForm, optionD: e.target.value })}
-      />
-      <button
-        className="mini-insert-button"
-        type="button"
-        onClick={() => appendToQuestionField('optionD', createCodeSnippet('txt'))}
-      >
-        + Kode ke D
-      </button>
-    </div>
-
-    <div className="admin-preview-box">
-      <div className="section-title-row">
-        <h4>Preview Pilihan Jawaban</h4>
-        <span>A / B / C / D</span>
-      </div>
-
-      <div className="answer-preview-grid">
-        <div>
-          <strong>A</strong>
           <div className="admin-preview-content">
-            <AdminPreviewContent content={questionForm.optionA} prefix="option-a-preview" />
+            <AdminPreviewContent
+              content={question.question}
+              prefix={`question-preview-${question.id || index}`}
+            />
           </div>
         </div>
 
-        <div>
-          <strong>B</strong>
-          <div className="admin-preview-content">
-            <AdminPreviewContent content={questionForm.optionB} prefix="option-b-preview" />
-          </div>
+        <div className="form-row">
+          <textarea
+            required
+            placeholder="Pilihan A"
+            value={question.optionA}
+            onChange={(e) => updateQuestionForms(index, 'optionA', e.target.value)}
+          />
+
+          <textarea
+            required
+            placeholder="Pilihan B"
+            value={question.optionB}
+            onChange={(e) => updateQuestionForms(index, 'optionB', e.target.value)}
+          />
         </div>
 
-        <div>
-          <strong>C</strong>
-          <div className="admin-preview-content">
-            <AdminPreviewContent content={questionForm.optionC} prefix="option-c-preview" />
-          </div>
+        <div className="form-row">
+          <textarea
+            required
+            placeholder="Pilihan C"
+            value={question.optionC}
+            onChange={(e) => updateQuestionForms(index, 'optionC', e.target.value)}
+          />
+
+          <textarea
+            required
+            placeholder="Pilihan D"
+            value={question.optionD}
+            onChange={(e) => updateQuestionForms(index, 'optionD', e.target.value)}
+          />
         </div>
+
+        <div className="admin-insert-toolbar">
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'optionA', createCodeSnippet('txt'))}
+          >
+            + Kode ke A
+          </button>
+
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'optionB', createCodeSnippet('txt'))}
+          >
+            + Kode ke B
+          </button>
+
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'optionC', createCodeSnippet('txt'))}
+          >
+            + Kode ke C
+          </button>
+
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'optionD', createCodeSnippet('txt'))}
+          >
+            + Kode ke D
+          </button>
+        </div>
+
+        <div className="admin-preview-box">
+          <div className="section-title-row">
+            <h4>Preview Pilihan Jawaban</h4>
+            <span>A / B / C / D</span>
+          </div>
+
+          <div className="answer-preview-grid">
+            <div>
+              <strong>A</strong>
+              <div className="admin-preview-content">
+                <AdminPreviewContent content={question.optionA} prefix={`option-a-preview-${question.id || index}`} />
+              </div>
+            </div>
+
+            <div>
+              <strong>B</strong>
+              <div className="admin-preview-content">
+                <AdminPreviewContent content={question.optionB} prefix={`option-b-preview-${question.id || index}`} />
+              </div>
+            </div>
+
+            <div>
+              <strong>C</strong>
+              <div className="admin-preview-content">
+                <AdminPreviewContent content={question.optionC} prefix={`option-c-preview-${question.id || index}`} />
+              </div>
+            </div>
 
             <div>
               <strong>D</strong>
               <div className="admin-preview-content">
-                <AdminPreviewContent content={questionForm.optionD} prefix="option-d-preview" />
+                <AdminPreviewContent content={question.optionD} prefix={`option-d-preview-${question.id || index}`} />
               </div>
             </div>
           </div>
         </div>
 
-    <select
-      value={questionForm.correctIndex}
-      onChange={(e) => setQuestionForm({ ...questionForm, correctIndex: Number(e.target.value) })}
-    >
-      <option value={0}>Jawaban benar: A</option>
-      <option value={1}>Jawaban benar: B</option>
-      <option value={2}>Jawaban benar: C</option>
-      <option value={3}>Jawaban benar: D</option>
-    </select>
+        <select
+          value={question.correctIndex}
+          onChange={(e) => updateQuestionForms(index, 'correctIndex', Number(e.target.value))}
+        >
+          <option value={0}>Jawaban benar: A</option>
+          <option value={1}>Jawaban benar: B</option>
+          <option value={2}>Jawaban benar: C</option>
+          <option value={3}>Jawaban benar: D</option>
+        </select>
 
-    <textarea
-      required
-      placeholder="Pembahasan jawaban"
-      value={questionForm.explanation}
-      onChange={(e) => setQuestionForm({ ...questionForm, explanation: e.target.value })}
-    />
+        <textarea
+          required
+          className="large-textarea"
+          placeholder="Pembahasan jawaban"
+          value={question.explanation}
+          onChange={(e) => updateQuestionForms(index, 'explanation', e.target.value)}
+        />
 
-    <div className="admin-insert-toolbar">
-      <button
-        type="button"
-        onClick={() => appendToQuestionField('explanation', createCodeSnippet('php'))}
-      >
-        + Kode PHP
-      </button>
+        <div className="admin-insert-toolbar">
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'explanation', createCodeSnippet('php'))}
+          >
+            + Kode PHP
+          </button>
 
-      <button
-        type="button"
-        onClick={() => appendToQuestionField('explanation', createCodeSnippet('html'))}
-      >
-        + Kode HTML
-      </button>
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'explanation', createCodeSnippet('html'))}
+          >
+            + Kode HTML
+          </button>
 
-      <button
-        type="button"
-        onClick={() => appendToQuestionField('explanation', createCodeSnippet('js'))}
-      >
-        + Kode JS
-      </button>
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'explanation', createCodeSnippet('js'))}
+          >
+            + Kode JS
+          </button>
 
-      <button
-        type="button"
-        onClick={() => appendToQuestionField('explanation', createImageSnippet())}
-      >
-        + Gambar
-      </button>
-    </div>
-
-    <div className="admin-preview-box">
-      <div className="section-title-row">
-        <h4>Preview Pembahasan</h4>
-        <span>Penjelasan jawaban</span>
-      </div>
-
-      <div className="admin-preview-content">
-        <AdminPreviewContent content={questionForm.explanation} prefix="explanation-preview" />
-      </div>
-    </div>
-
-    <label className="check-line">
-      <input
-        type="checkbox"
-        checked={questionForm.published}
-        onChange={(e) => setQuestionForm({ ...questionForm, published: e.target.checked })}
-      />
-      Publish soal
-    </label>
-
-    <div className="member-actions">
-      <PixelButton type="submit">
-        Simpan Soal
-      </PixelButton>
-
-      <PixelButton
-        type="button"
-        variant="secondary"
-        onClick={() => setQuestionForm({
-          ...emptyQuestion,
-          courseId: String(activeCourseId),
-          order: selectedCourseQuestions.length + 1
-        })}
-      >
-        Soal Baru
-      </PixelButton>
-    </div>
-  </form>
-
-  <div className="admin-list compact-list">
-    {selectedCourseQuestions.length ? selectedCourseQuestions.map((question) => (
-      <div className="editor-card" key={question.id}>
-        <div>
-          <strong>{question.order}. {question.question}</strong>
-          <p>
-            Stage {question.courseId} · Jawaban benar: {
-              ['A', 'B', 'C', 'D'][Number(question.correctIndex || 0)]
-            } · {question.published ? 'Published' : 'Draft'}
-          </p>
+          <button
+            type="button"
+            onClick={() => appendToQuestionFormFieldAt(index, 'explanation', createImageSnippet())}
+          >
+            + Gambar
+          </button>
         </div>
+
+        <div className="admin-preview-box">
+          <div className="section-title-row">
+            <h4>Preview Pembahasan</h4>
+            <span>Penjelasan jawaban</span>
+          </div>
+
+          <div className="admin-preview-content">
+            <AdminPreviewContent
+              content={question.explanation}
+              prefix={`explanation-preview-${question.id || index}`}
+            />
+          </div>
+        </div>
+
+        <label className="check-line">
+          <input
+            type="checkbox"
+            checked={question.published}
+            onChange={(e) => updateQuestionForms(index, 'published', e.target.checked)}
+          />
+          Publish soal ini
+        </label>
 
         <div className="member-actions">
           <PixelButton
             type="button"
             variant="secondary"
-            onClick={() => setQuestionForm({
-              ...questionToForm(question),
-              courseId: String(activeCourseId),
-              published: question.published !== false
-            })}
+            onClick={() => removeQuestionFormAt(index)}
           >
-            Edit
-          </PixelButton>
-
-          <PixelButton
-            type="button"
-            variant="danger"
-            onClick={() => handleDelete('questions', question.id)}
-          >
-            Hapus
+            {question.id ? 'Hapus Soal' : 'Buang Soal Baru'}
           </PixelButton>
         </div>
       </div>
-    )) : (
-      <p>Belum ada soal untuk stage ini. Tambahkan soal pertama lewat form di atas.</p>
-    )}
-  </div>
+    ))}
+
+    <div className="member-actions">
+      <PixelButton type="submit">
+        Simpan Semua Soal
+      </PixelButton>
+
+      <PixelButton
+        type="button"
+        variant="secondary"
+        onClick={addQuestionForm}
+      >
+        Tambah Soal
+      </PixelButton>
+    </div>
+  </form>
 </div>
 
           </>
@@ -2791,137 +3518,6 @@ async function handleRejectChallengeSubmission(submission) {
 
 
 
-      {activeTab === 'roadmap' ? (
-        <section className="admin-editor-grid">
-          <PixelCard>
-            <h2>Tambah / Edit Stage</h2>
-            <form className="form-stack" onSubmit={handleCourseSubmit}>
-              <div className="form-row">
-                <input required min="1" placeholder="Stage" type="number" value={courseForm.stage} onChange={(e) => setCourseForm({ ...courseForm, stage: e.target.value, order: e.target.value, id: String(e.target.value) })} />
-                <input required min="1" placeholder="Urutan" type="number" value={courseForm.order} onChange={(e) => setCourseForm({ ...courseForm, order: e.target.value })} />
-              </div>
-              <input required placeholder="Judul stage" value={courseForm.title} onChange={(e) => setCourseForm({ ...courseForm, title: e.target.value })} />
-              <input placeholder="Area, contoh: Dasar Logika Program" value={courseForm.area} onChange={(e) => setCourseForm({ ...courseForm, area: e.target.value })} />
-              <textarea required placeholder="Deskripsi singkat stage" value={courseForm.theme} onChange={(e) => setCourseForm({ ...courseForm, theme: e.target.value })} />
-              <div className="form-row">
-                <label htmlFor="">nilai minimal</label>
-                <input min="0" max="100" type="number" placeholder="Nilai minimal" value={courseForm.minScore} onChange={(e) => setCourseForm({ ...courseForm, minScore: e.target.value })} />
-                <label htmlFor="">jumlah xp</label>
-                <input min="0" type="number" placeholder="XP reward" value={courseForm.xpReward} onChange={(e) => setCourseForm({ ...courseForm, xpReward: e.target.value })} />
-                <label htmlFor="">jumlah koin</label>
-                <input min="0" type="number" placeholder="Koin reward" value={courseForm.coinReward} onChange={(e) => setCourseForm({ ...courseForm, coinReward: e.target.value })} />
-              </div>
-              <input placeholder="ID badge reward, opsional" value={courseForm.badgeId} onChange={(e) => setCourseForm({ ...courseForm, badgeId: e.target.value })} />
-              <label className="check-line">
-                <input type="checkbox" checked={courseForm.published} onChange={(e) => setCourseForm({ ...courseForm, published: e.target.checked })} />
-                Publish ke anggota
-              </label>
-              <div className="member-actions">
-                <PixelButton type="submit">Simpan Stage</PixelButton>
-                <PixelButton type="button" variant="secondary" onClick={() => setCourseForm(emptyCourse)}>Bersihkan</PixelButton>
-              </div>
-            </form>
-          </PixelCard>
-          <div className="admin-announcement-list">
-            {contentData.courses.length ? contentData.courses.map((course) => (
-              <PixelCard key={course.id}>
-                <h3>Stage {course.stage}: {course.title}</h3>
-                <p>{course.area || 'Tanpa area'} · {course.published ? 'Published' : 'Draft'}</p>
-                <div className="member-actions">
-                  <PixelButton variant="secondary" onClick={() => setCourseForm(course)}>Edit</PixelButton>
-                  <PixelButton variant="danger" onClick={() => handleDelete('courses', course.id)}>Hapus</PixelButton>
-                </div>
-              </PixelCard>
-            )) : <PixelCard>Belum ada roadmap. Tambahkan stage pertama dari form ini.</PixelCard>}
-          </div>
-        </section>
-      ) : null}
-
-      {activeTab === 'materials' ? (
-        <section className="admin-editor-grid">
-          <PixelCard>
-            <h2>Tambah / Edit Materi</h2>
-            <form className="form-stack" onSubmit={handleSectionSubmit}>
-              <select required value={sectionForm.courseId} onChange={(e) => setSectionForm({ ...sectionForm, courseId: e.target.value })}>
-                <option value="">Pilih stage</option>
-                {contentData.courses.map((course) => <option key={course.id} value={course.id}>Stage {course.stage}: {course.title}</option>)}
-              </select>
-              <input min="1" type="number" placeholder="Urutan materi" value={sectionForm.order} onChange={(e) => setSectionForm({ ...sectionForm, order: e.target.value })} />
-              <input required placeholder="Judul materi" value={sectionForm.title} onChange={(e) => setSectionForm({ ...sectionForm, title: e.target.value })} />
-              <textarea className="large-textarea" required placeholder="Isi materi. Pisahkan paragraf dengan enter." value={sectionForm.content} onChange={(e) => setSectionForm({ ...sectionForm, content: e.target.value })} />
-              <textarea placeholder="Contoh kode, opsional" value={sectionForm.code} onChange={(e) => setSectionForm({ ...sectionForm, code: e.target.value })} />
-              <input placeholder="Checkpoint / ringkasan kecil" value={sectionForm.checkpoint} onChange={(e) => setSectionForm({ ...sectionForm, checkpoint: e.target.value })} />
-              <label className="check-line">
-                <input type="checkbox" checked={sectionForm.published} onChange={(e) => setSectionForm({ ...sectionForm, published: e.target.checked })} />
-                Publish materi
-              </label>
-              <div className="member-actions">
-                <PixelButton type="submit">Simpan Materi</PixelButton>
-                <PixelButton type="button" variant="secondary" onClick={() => setSectionForm(emptySection)}>Bersihkan</PixelButton>
-              </div>
-            </form>
-          </PixelCard>
-          <div className="admin-list">
-            {contentData.courseSections.length ? contentData.courseSections.map((section) => (
-              <PixelCard key={section.id}>
-                <h3>{section.title}</h3>
-                <p>Stage {section.courseId} · Urutan {section.order} · {section.published ? 'Published' : 'Draft'}</p>
-                <div className="member-actions">
-                  <PixelButton variant="secondary" onClick={() => setSectionForm(section)}>Edit</PixelButton>
-                  <PixelButton variant="danger" onClick={() => handleDelete('courseSections', section.id)}>Hapus</PixelButton>
-                </div>
-              </PixelCard>
-            )) : <PixelCard>Belum ada materi. Pilih stage lalu tulis materi pertama.</PixelCard>}
-          </div>
-        </section>
-      ) : null}
-
-      {activeTab === 'questions' ? (
-        <section className="admin-editor-grid">
-          <PixelCard>
-            <h2>Tambah / Edit Soal</h2>
-            <form className="form-stack" onSubmit={handleQuestionSubmit}>
-              <select required value={questionForm.courseId} onChange={(e) => setQuestionForm({ ...questionForm, courseId: e.target.value })}>
-                <option value="">Pilih stage</option>
-                {contentData.courses.map((course) => <option key={course.id} value={course.id}>Stage {course.stage}: {course.title}</option>)}
-              </select>
-              <input min="1" type="number" placeholder="Urutan soal" value={questionForm.order} onChange={(e) => setQuestionForm({ ...questionForm, order: e.target.value })} />
-              <textarea required placeholder="Pertanyaan" value={questionForm.question} onChange={(e) => setQuestionForm({ ...questionForm, question: e.target.value })} />
-              <input required placeholder="Pilihan A" value={questionForm.optionA} onChange={(e) => setQuestionForm({ ...questionForm, optionA: e.target.value })} />
-              <input required placeholder="Pilihan B" value={questionForm.optionB} onChange={(e) => setQuestionForm({ ...questionForm, optionB: e.target.value })} />
-              <input placeholder="Pilihan C" value={questionForm.optionC} onChange={(e) => setQuestionForm({ ...questionForm, optionC: e.target.value })} />
-              <input placeholder="Pilihan D" value={questionForm.optionD} onChange={(e) => setQuestionForm({ ...questionForm, optionD: e.target.value })} />
-              <select value={questionForm.correctIndex} onChange={(e) => setQuestionForm({ ...questionForm, correctIndex: Number(e.target.value) })}>
-                <option value={0}>Jawaban benar: A</option>
-                <option value={1}>Jawaban benar: B</option>
-                <option value={2}>Jawaban benar: C</option>
-                <option value={3}>Jawaban benar: D</option>
-              </select>
-              <textarea required placeholder="Pembahasan jawaban" value={questionForm.explanation} onChange={(e) => setQuestionForm({ ...questionForm, explanation: e.target.value })} />
-              <label className="check-line">
-                <input type="checkbox" checked={questionForm.published} onChange={(e) => setQuestionForm({ ...questionForm, published: e.target.checked })} />
-                Publish soal
-              </label>
-              <div className="member-actions">
-                <PixelButton type="submit">Simpan Soal</PixelButton>
-                <PixelButton type="button" variant="secondary" onClick={() => setQuestionForm(emptyQuestion)}>Bersihkan</PixelButton>
-              </div>
-            </form>
-          </PixelCard>
-          <div className="admin-list">
-            {contentData.questions.length ? contentData.questions.map((question) => (
-              <PixelCard key={question.id}>
-                <h3>{question.question}</h3>
-                <p>Stage {question.courseId} · Urutan {question.order} · {question.published ? 'Published' : 'Draft'}</p>
-                <div className="member-actions">
-                  <PixelButton variant="secondary" onClick={() => setQuestionForm(questionToForm(question))}>Edit</PixelButton>
-                  <PixelButton variant="danger" onClick={() => handleDelete('questions', question.id)}>Hapus</PixelButton>
-                </div>
-              </PixelCard>
-            )) : <PixelCard>Belum ada soal. Tambahkan soal setelah stage dibuat.</PixelCard>}
-          </div>
-        </section>
-      ) : null}
 
       {activeTab === 'announcements' ? (
   <section className="admin-editor-grid announcements-admin-layout">
@@ -4022,6 +4618,225 @@ async function handleRejectChallengeSubmission(submission) {
   </section>
 ) : null}
 
+
+
+      {activeTab === 'shop' ? (
+        <section className="two-column admin-shop-panel">
+          <PixelCard>
+            <h2>Kelola Coin Shop</h2>
+            <form className="form-stack" onSubmit={handleShopSubmit}>
+              <label>ID Item<input value={shopForm.id} onChange={(e) => setShopForm({ ...shopForm, id: e.target.value })} placeholder="kosongkan untuk otomatis" /></label>
+              <label>Jenis<select value={shopForm.type} onChange={(e) => setShopForm({ ...shopForm, type: e.target.value })}>
+                <option value="avatar">Avatar</option><option value="frame">Frame</option><option value="title">Title</option><option value="badge">Badge</option><option value="nameColor">Warna Nama</option><option value="profileDecoration">Dekorasi Profil</option>
+              </select></label>
+              <label>Nama<input value={shopForm.name} onChange={(e) => setShopForm({ ...shopForm, name: e.target.value })} /></label>
+              <div className="admin-editor-grid compact-grid">
+                <label>Icon<input value={shopForm.icon} onChange={(e) => setShopForm({ ...shopForm, icon: e.target.value })} /></label>
+                <label>Warna<input value={shopForm.color} onChange={(e) => setShopForm({ ...shopForm, color: e.target.value })} placeholder="#ff9ac9" /></label>
+                <label>Harga<input type="number" value={shopForm.price} onChange={(e) => setShopForm({ ...shopForm, price: Number(e.target.value) })} /></label>
+                <label>Urutan<input type="number" value={shopForm.order} onChange={(e) => setShopForm({ ...shopForm, order: Number(e.target.value) })} /></label>
+              </div>
+              <label>Rarity<select value={shopForm.rarity} onChange={(e) => setShopForm({ ...shopForm, rarity: e.target.value })}>{RARITY_LIST.map((rarity) => <option key={rarity} value={rarity}>{getRarityLabel(rarity)}</option>)}</select></label>
+              <label>Deskripsi<textarea value={shopForm.description} onChange={(e) => setShopForm({ ...shopForm, description: e.target.value })} /></label>
+              <label className="inline-check"><input type="checkbox" checked={shopForm.published} onChange={(e) => setShopForm({ ...shopForm, published: e.target.checked })} /> Published</label>
+              <PixelButton type="submit">Simpan Item Shop</PixelButton>
+            </form>
+          </PixelCard>
+          <PixelCard>
+            <h2>Item Shop</h2>
+            <div className="compact-list">
+              {shopItems.length ? shopItems.map((item) => (
+                <div className="admin-list-row" key={item.id}>
+                  <div><strong>{item.icon} {item.name}</strong><span>{item.type} · 🪙 {item.price} · {item.published ? 'Published' : 'Draft'}</span></div>
+                  <div className="button-row"><button type="button" onClick={() => handleEditShopItem(item)}>Edit</button><button type="button" onClick={() => handleDeleteShopItem(item.id)}>Hapus</button></div>
+                </div>
+              )) : <p>Belum ada item shop.</p>}
+            </div>
+          </PixelCard>
+        </section>
+      ) : null}
+
+      {activeTab === 'health' ? (
+        <section className="two-column">
+          <PixelCard>
+            <h2>Admin Health Check</h2>
+            <p>Masalah terdeteksi: {systemHealth.total} · Bahaya: {systemHealth.danger} · Peringatan: {systemHealth.warning}</p>
+            <PixelButton type="button" variant="secondary" onClick={handleRepairAllMembers}>Perbaiki Data Member Lama</PixelButton>
+          </PixelCard>
+          <PixelCard>
+            <h2>Detail Temuan</h2>
+            <div className="compact-list">
+              {systemHealth.reports.length ? systemHealth.reports.slice(0, 30).map((report, index) => (
+                <div className={`admin-list-row ${report.level}`} key={`${report.message}-${index}`}><strong>{report.level}</strong><span>{report.message}</span></div>
+              )) : <p>Tidak ada masalah besar yang terdeteksi.</p>}
+            </div>
+          </PixelCard>
+        </section>
+      ) : null}
+
+      {activeTab === 'final-projects' ? (
+        <section className="material-list">
+          {finalSubmissions.length ? finalSubmissions.map((submission) => (
+            <PixelCard key={submission.id}>
+              <div className="section-title-row"><div><p className="eyebrow">{submission.status}</p><h2>{submission.title}</h2><p>{submission.memberName} · {submission.nim}</p></div></div>
+              <p>{submission.description}</p>
+              <div className="button-row">
+                {submission.demoUrl ? <a className="pixel-button secondary" href={submission.demoUrl} target="_blank" rel="noreferrer">Demo</a> : null}
+                {submission.githubUrl ? <a className="pixel-button secondary" href={submission.githubUrl} target="_blank" rel="noreferrer">GitHub</a> : null}
+                {submission.screenshotUrl ? <a className="pixel-button secondary" href={submission.screenshotUrl} target="_blank" rel="noreferrer">Screenshot</a> : null}
+              </div>
+              <label className="form-field">Catatan Admin<textarea value={certificateReviewNotes[submission.id] || submission.adminNote || ''} onChange={(e) => setCertificateReviewNotes({ ...certificateReviewNotes, [submission.id]: e.target.value })} /></label>
+              <div className="button-row"><PixelButton type="button" onClick={() => handleReviewFinalProject(submission, 'approved')}>Approve</PixelButton><PixelButton type="button" variant="secondary" onClick={() => handleReviewFinalProject(submission, 'revision')}>Minta Revisi</PixelButton><PixelButton type="button" variant="ghost" onClick={() => handleReviewFinalProject(submission, 'rejected')}>Reject</PixelButton></div>
+            </PixelCard>
+          )) : <PixelCard><h2>Belum ada Final Project</h2><p>Submission anggota akan tampil di sini.</p></PixelCard>}
+        </section>
+      ) : null}
+
+      {activeTab === 'certificates' ? (
+        <section className="two-column">
+          <PixelCard>
+            <h2>Pengaturan Sertifikat</h2>
+            <form className="form-stack" onSubmit={handleCertificateSettingsSubmit}>
+              <label>Nama Program<input value={certificateSettings.programName || ''} onChange={(e) => setCertificateSettings({ ...certificateSettings, programName: e.target.value })} /></label>
+              <label>Nama Lembaga<input value={certificateSettings.organizationName || ''} onChange={(e) => setCertificateSettings({ ...certificateSettings, organizationName: e.target.value })} /></label>
+              <label>Nama Penanda Tangan<input value={certificateSettings.signerName || ''} onChange={(e) => setCertificateSettings({ ...certificateSettings, signerName: e.target.value })} /></label>
+              <label>Jabatan<input value={certificateSettings.signerTitle || ''} onChange={(e) => setCertificateSettings({ ...certificateSettings, signerTitle: e.target.value })} /></label>
+              <label>Syarat<textarea value={certificateSettings.requirementText || ''} onChange={(e) => setCertificateSettings({ ...certificateSettings, requirementText: e.target.value })} /></label>
+              <label>Logo URL<input value={certificateSettings.logoUrl || ''} onChange={(e) => setCertificateSettings({ ...certificateSettings, logoUrl: e.target.value })} /></label>
+              <label>Tanda Tangan URL<input value={certificateSettings.signatureUrl || ''} onChange={(e) => setCertificateSettings({ ...certificateSettings, signatureUrl: e.target.value })} /></label>
+              <label>Stempel URL<input value={certificateSettings.stampUrl || ''} onChange={(e) => setCertificateSettings({ ...certificateSettings, stampUrl: e.target.value })} /></label>
+              <PixelButton type="submit">Simpan Pengaturan</PixelButton>
+            </form>
+          </PixelCard>
+          <PixelCard>
+            <h2>Eligible Sertifikat</h2>
+            <div className="compact-list">
+              {allMembers.filter((member) => member.finalProjectStatus === 'approved').map((member) => (
+                <div className="admin-list-row" key={member.uid}><div><strong>{member.name}</strong><span>{member.certificateStatus === 'issued' ? member.certificateCode : 'Belum diterbitkan'}</span></div>{member.certificateStatus === 'issued' ? null : <PixelButton type="button" onClick={() => handleIssueCertificate(member)}>Terbitkan</PixelButton>}</div>
+              ))}
+            </div>
+            <h2>Daftar Sertifikat</h2>
+            <div className="compact-list">
+              {certificates.length ? certificates.map((certificate) => (
+                <div className="admin-list-row" key={certificate.code || certificate.id}><div><strong>{certificate.code || certificate.id}</strong><span>{certificate.memberName} · {certificate.status}</span></div>{certificate.status !== 'revoked' ? <button type="button" onClick={() => handleRevokeCertificate(certificate)}>Revoke</button> : null}</div>
+              )) : <p>Belum ada sertifikat.</p>}
+            </div>
+          </PixelCard>
+        </section>
+      ) : null}
+
+      {activeTab === 'media' ? (
+        <section className="two-column">
+          <PixelCard>
+            <h2>Media Manager</h2>
+            <form className="form-stack" onSubmit={handleMediaSubmit}>
+              <label>Judul Media<input value={mediaForm.title} onChange={(e) => setMediaForm({ ...mediaForm, title: e.target.value })} /></label>
+              <label>Pilih Gambar<input type="file" accept="image/*" onChange={handleMediaFileUpload} /></label>
+              {mediaForm.dataUrl ? <img className="media-preview" src={mediaForm.dataUrl} alt={mediaForm.title || 'Preview'} /> : null}
+              <PixelButton type="submit" disabled={!mediaForm.dataUrl}>Simpan Media</PixelButton>
+            </form>
+          </PixelCard>
+          <PixelCard>
+            <h2>Daftar Media</h2>
+            <div className="compact-list">
+              {mediaAssets.length ? mediaAssets.map((asset) => (
+                <div className="media-asset-row" key={asset.id}><img src={asset.dataUrl} alt={asset.title} /><div><strong>{asset.title}</strong><textarea readOnly value={asset.markdown || `![${asset.title}](${asset.dataUrl})`} /></div><button type="button" onClick={() => handleDeleteMedia(asset.id)}>Hapus</button></div>
+              )) : <p>Belum ada media.</p>}
+            </div>
+          </PixelCard>
+        </section>
+      ) : null}
+
+      {activeTab === 'content-tools' ? (
+        <section className="two-column">
+          <PixelCard><h2>Export Konten Belajar</h2><p>Export hanya courses, courseSections, dan questions.</p><PixelButton type="button" onClick={handleExportLearningContent}>Export Konten</PixelButton></PixelCard>
+          <PixelCard><h2>Import Konten Belajar</h2><p>Import JSON konten belajar. Gunakan file dari export konten.</p><input type="file" accept="application/json,.json" onChange={handleImportLearningContent} /></PixelCard>
+        </section>
+      ) : null}
+
+      {activeTab === 'reports' ? (
+        <section className="admin-report-layout">
+          <PixelCard>
+            <p className="eyebrow">Laporan User</p>
+            <h2>Laporan Materi & Soal</h2>
+            <p>
+              Daftar laporan dari siswa ketika ada materi membingungkan, gambar rusak,
+              kode tidak tampil, atau jawaban quiz keliru.
+            </p>
+          </PixelCard>
+
+          <section className="admin-report-list">
+            {(contentData.contentReports || []).length ? (
+              (contentData.contentReports || []).map((report) => (
+                <PixelCard className={`admin-report-card ${report.status === 'resolved' ? 'is-resolved' : 'is-open'}`} key={report.id}>
+                  <div className="section-title-row">
+                    <div>
+                      <p className="eyebrow">{report.type || 'laporan'}</p>
+                      <h3>{report.targetTitle || `Stage ${report.courseId}`}</h3>
+                      <p>
+                        {report.memberName || 'Anggota'} · Stage {report.courseId || '-'} · {formatAdminDate(report.createdAt)}
+                      </p>
+                    </div>
+                    <span className={`status-pill ${report.status || 'open'}`}>{report.status || 'open'}</span>
+                  </div>
+
+                  <p>{report.message}</p>
+
+                  <div className="member-actions">
+                    {report.status !== 'resolved' ? (
+                      <PixelButton type="button" onClick={() => handleResolveContentReport(report, 'resolved')}>
+                        Tandai Selesai
+                      </PixelButton>
+                    ) : (
+                      <PixelButton type="button" variant="secondary" onClick={() => handleResolveContentReport(report, 'open')}>
+                        Buka Lagi
+                      </PixelButton>
+                    )}
+                  </div>
+                </PixelCard>
+              ))
+            ) : (
+              <PixelCard className="locked-panel">
+                <span className="big-icon">✅</span>
+                <h2>Belum ada laporan</h2>
+                <p>Kalau siswa melaporkan materi atau soal, laporannya akan muncul di sini.</p>
+              </PixelCard>
+            )}
+          </section>
+        </section>
+      ) : null}
+
+      {activeTab === 'audit' ? (
+        <section className="admin-report-layout">
+          <PixelCard>
+            <p className="eyebrow">Audit Log</p>
+            <h2>Riwayat Aksi Penting Admin</h2>
+            <p>Audit log membantu melacak perubahan data penting seperti reset, restore, edit reward, edit stage, dan approve challenge.</p>
+          </PixelCard>
+
+          <section className="admin-audit-list">
+            {(contentData.auditLogs || []).length ? (
+              (contentData.auditLogs || []).slice(0, 80).map((log) => (
+                <PixelCard className="admin-audit-card" key={log.id || `${log.action}-${log.createdAt}`}>
+                  <div className="section-title-row">
+                    <div>
+                      <p className="eyebrow">{log.action || 'system'}</p>
+                      <h3>{log.message || 'Aktivitas admin'}</h3>
+                      <p>{formatAdminDate(log.createdAt)}</p>
+                    </div>
+                  </div>
+                </PixelCard>
+              ))
+            ) : (
+              <PixelCard className="locked-panel">
+                <span className="big-icon">🧾</span>
+                <h2>Audit log belum ada</h2>
+                <p>Audit log akan terisi otomatis setelah admin melakukan aksi penting.</p>
+              </PixelCard>
+            )}
+          </section>
+        </section>
+      ) : null}
 
       {activeTab === 'backup' ? (
   <section className="backup-admin-section">

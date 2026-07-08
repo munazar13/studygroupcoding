@@ -5,7 +5,7 @@ import PixelButton from '../components/PixelButton';
 import PixelCard from '../components/PixelCard';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { loadCourse, loadQuestions } from '../services/dataApi';
+import { createContentReport, loadCourse, loadQuestions } from '../services/dataApi';
 import { applyQuizAttempt, applyQuizPass } from '../utils/progress';
 
 function renderQuizContent(content, keyPrefix = 'quiz-content') {
@@ -93,6 +93,16 @@ if (lines.length > 1 && knownLanguages.includes(firstLine.toLowerCase())) {
   });
 }
 
+function hasNumberId(items = [], id) {
+  const target = Number(id);
+
+  return items.some((item) => Number(item) === target);
+}
+
+function getCourseStageNumber(course = {}) {
+  return Number(course.stage || course.order || course.id || 0);
+}
+
 export default function Quiz() {
 
   const { stageId } = useParams();
@@ -105,6 +115,9 @@ export default function Quiz() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportMessage, setReportMessage] = useState('');
+  const [reportSending, setReportSending] = useState(false);
 
   useEffect(() => {
     Promise.all([loadCourse(stageId), loadQuestions(stageId)])
@@ -117,7 +130,7 @@ export default function Quiz() {
 
   const activeQuestion = questions[activeIndex];
   const progress = questions.length ? ((activeIndex + 1) / questions.length) * 100 : 0;
-  const courseCompleted = (currentMember.completedCourses || []).includes(Number(stageId));
+  const courseCompleted = hasNumberId(currentMember.completedCourses || [], stageId);
 
   const computedResult = useMemo(() => {
     const correct = questions.reduce((total, question) => {
@@ -139,7 +152,16 @@ export default function Quiz() {
   }
 
   if (!course || !questions.length) {
-    return <main className="page-shell"><PixelCard>Soal belum tersedia untuk stage ini.</PixelCard></main>;
+    return (
+      <main className="page-shell center-page">
+        <PixelCard className="locked-panel">
+          <span className="big-icon">❓</span>
+          <h1>Quiz belum tersedia</h1>
+          <p>Soal stage ini belum dipublikasikan atau belum lengkap. Silakan kembali ke materi.</p>
+          <Link className="pixel-button primary" to={`/course/${stageId}`}>Kembali ke Materi</Link>
+        </PixelCard>
+      </main>
+    );
   }
 
   if (!courseCompleted) {
@@ -155,14 +177,49 @@ export default function Quiz() {
     );
   }
 
+  async function submitQuizReport(event) {
+    event.preventDefault();
+
+    const cleanMessage = reportMessage.trim();
+
+    if (!cleanMessage) {
+      showToast('Isi detail laporan dulu.', 'error');
+      return;
+    }
+
+    setReportSending(true);
+
+    try {
+      await createContentReport({
+        uid: currentMember.uid,
+        memberName: currentMember.name,
+        type: 'quiz',
+        courseId: String(course.id || stageId),
+        targetId: String(activeQuestion?.id || course.id || stageId),
+        targetTitle: `${course.title} · Soal ${activeIndex + 1}`,
+        message: cleanMessage,
+        status: 'open'
+      });
+
+      setReportMessage('');
+      setReportOpen(false);
+      showToast('Laporan soal berhasil dikirim ke admin.');
+    } catch (error) {
+      console.error(error);
+      showToast(error.message || 'Gagal mengirim laporan soal.', 'error');
+    } finally {
+      setReportSending(false);
+    }
+  }
+
   async function finishQuiz() {
   if (Object.keys(answers).length < questions.length) {
     showToast('Jawab semua soal dulu.', 'error');
     return;
   }
 
-  const stageNumber = Number(course.id || stageId);
-  const alreadyPassed = (currentMember.passedStages || []).includes(stageNumber);
+  const stageNumber = getCourseStageNumber(course) || Number(stageId);
+  const alreadyPassed = hasNumberId(currentMember.passedStages || [], stageNumber);
   const oldLevel = Number(currentMember.level || 1);
 
   const chestStages = [5, 10, 15, 20, 25, 30, 32];
@@ -420,6 +477,35 @@ export default function Quiz() {
           <PixelButton onClick={finishQuiz}>Selesaikan</PixelButton>
         )}
       </div>
+
+      <PixelCard className="content-report-card">
+        <div className="section-title-row">
+          <div>
+            <p className="eyebrow">Lapor Soal</p>
+            <h2>Ada soal yang keliru?</h2>
+            <p>Laporkan kalau pilihan jawaban, pembahasan, gambar, atau kode pada soal ini perlu diperiksa.</p>
+          </div>
+          <PixelButton type="button" variant="secondary" onClick={() => setReportOpen((open) => !open)}>
+            {reportOpen ? 'Tutup Laporan' : 'Laporkan Soal'}
+          </PixelButton>
+        </div>
+
+        {reportOpen ? (
+          <form className="form-stack" onSubmit={submitQuizReport}>
+            <label>
+              Detail Laporan
+              <textarea
+                value={reportMessage}
+                onChange={(event) => setReportMessage(event.target.value)}
+                placeholder="Contoh: jawaban benar sepertinya bukan pilihan B, atau pembahasannya membingungkan."
+              />
+            </label>
+            <PixelButton type="submit" disabled={reportSending}>
+              {reportSending ? 'Mengirim...' : 'Kirim Laporan Soal'}
+            </PixelButton>
+          </form>
+        ) : null}
+      </PixelCard>
     </main>
   );
 }

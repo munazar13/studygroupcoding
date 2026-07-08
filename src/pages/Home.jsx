@@ -7,6 +7,7 @@ import { loadPublicData } from '../services/dataApi';
 import { useAuth } from '../context/AuthContext';
 import AnnouncementsPanel from '../components/AnnouncementsPanel';
 import SetupNotice from '../components/SetupNotice';
+import PwaInstallButton from '../components/PwaInstallButton';
 
 function isChallengeActive(challenge) {
   const today = new Date();
@@ -63,7 +64,7 @@ function formatChallengeDate(challenge) {
 
 
 export default function Home() {
-  const { firebaseConfigured } = useAuth();
+  const { firebaseConfigured, currentMember } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   
@@ -113,8 +114,9 @@ export default function Home() {
           </p>
 
           <div className="hero-actions">
-            <Link className="pixel-button primary" to="/login">Mulai Petualangan</Link>
-            <Link className="pixel-button secondary" to="/about">Lihat Komunitas</Link>
+            <Link className="pixel-button primary" to={currentMember ? "/map" : "/login"}>Mulai Petualangan</Link>
+            <Link className="pixel-button secondary" to="/cara-bermain">Cara Bermain</Link>
+            <PwaInstallButton />
           </div>
         </div>
 
@@ -218,15 +220,17 @@ export default function Home() {
           </div>
         </PixelCard>
 
-        <PixelCard>
-          <h2>Cara Main</h2>
+        <PixelCard id="cara-bermain">
+          <h2>Cara Bermain</h2>
 
           <ol className="clean-list numbered">
-            <li>Daftar memakai nama asli dan NIM.</li>
+            <li>Daftar memakai nama asli, NIM, dan email pemulihan.</li>
             <li>Tunggu akun disetujui pengurus.</li>
-            <li>Baca materi stage aktif.</li>
+            <li>Masuk ke Learning Map dan cari stage yang ingin dipelajari.</li>
+            <li>Baca materi, simpan bookmark, dan tulis catatan pribadi.</li>
             <li>Selesaikan Quiz Battle untuk membuka stage berikutnya.</li>
             <li>Ikut tantangan aktif untuk mendapatkan reward tambahan.</li>
+            <li>Selesaikan tugas akhir sebelum sertifikat diterbitkan.</li>
           </ol>
         </PixelCard>
       </section>

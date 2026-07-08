@@ -6,13 +6,40 @@ export function isStageUnlocked(member, stageId) {
   return Number(stageId) <= Number(member.currentStage || 1);
 }
 
+function getCourseStageNumber(course = {}) {
+  return Number(course.stage || course.order || course.id || 0);
+}
+
+function getCompletedStageSet(member = {}) {
+  return new Set([
+    ...(member.passedStages || []),
+    ...(member.completedStages || [])
+  ]
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item) && item > 0)
+  );
+}
+
 export function getNextCourse(courses, member) {
   if (!courses.length || !member) {
     return null;
   }
 
   const currentStage = Number(member.currentStage || 1);
-  return courses.find((course) => Number(course.id) === currentStage) || courses[0];
+  const completedStages = getCompletedStageSet(member);
+  const sortedCourses = [...courses].sort(
+    (a, b) => getCourseStageNumber(a) - getCourseStageNumber(b)
+  );
+
+  return (
+    sortedCourses.find((course) => {
+      const stageNumber = getCourseStageNumber(course);
+
+      return stageNumber >= currentStage && !completedStages.has(stageNumber);
+    }) ||
+    sortedCourses.find((course) => !completedStages.has(getCourseStageNumber(course))) ||
+    null
+  );
 }
 
 export function getRank(ranks, xp = 0) {

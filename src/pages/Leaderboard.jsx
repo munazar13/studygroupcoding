@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import MemberName from '../components/MemberName';
 import LoadingState from '../components/LoadingState';
 import PixelCard from '../components/PixelCard';
 import { loadLearningData } from '../services/dataApi';
@@ -206,7 +207,7 @@ export default function Leaderboard() {
 
               <div className="leader-info">
                 <div className="leader-name-row">
-                  <h3>{member.name}</h3>
+                  <h3><MemberName member={member} /></h3>
                   <p className="leader-letting">
                   {formatLetting(member)}
                   </p>

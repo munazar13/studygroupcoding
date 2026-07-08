@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import LoadingState from '../components/LoadingState';
 import PixelButton from '../components/PixelButton';
 import PixelCard from '../components/PixelCard';
+import MemberName from '../components/MemberName';
 import StatCard from '../components/StatCard';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
@@ -180,7 +181,7 @@ const latestChallengeReview = challengeSubmissions.find(
 
         <div>
           <p className="eyebrow">Profil Anggota</p>
-          <h1>{currentMember.name}</h1>
+          <h1><MemberName member={currentMember} /></h1>
 
           <p>
             {activeTitle ? getRewardName(activeTitle) : rank.name} · {currentMember.cohort}
@@ -230,6 +231,75 @@ const latestChallengeReview = challengeSubmissions.find(
           <p>Title aktif: {activeTitle ? getRewardName(activeTitle) : 'Belum dipilih'}</p>
           <p>Badge aktif: {activeBadge ? getRewardName(activeBadge) : 'Belum dipilih'}</p>
           <p>Title dan badge aktif akan tampil di leaderboard.</p>
+        </PixelCard>
+      </section>
+
+      <section className="section-block two-column">
+        <PixelCard>
+          <h2>Bookmark Materi</h2>
+          {(currentMember.materialBookmarks || []).length ? (
+            <div className="bookmark-list compact-list">
+              {(currentMember.materialBookmarks || []).slice(0, 6).map((bookmark) => (
+                <a className="bookmark-row" href={`#/course/${bookmark.courseId}`} key={bookmark.id || `${bookmark.courseId}-${bookmark.moduleId}`}>
+                  <strong>{bookmark.moduleTitle || 'Materi tersimpan'}</strong>
+                  <span>{bookmark.courseTitle || `Stage ${bookmark.courseId}`}</span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p>Belum ada bookmark. Tandai materi penting dari halaman stage.</p>
+          )}
+        </PixelCard>
+
+        <PixelCard>
+          <h2>Catatan Pribadi</h2>
+          {Object.keys(currentMember.privateNotes || {}).length ? (
+            <div className="private-note-list compact-list">
+              {Object.entries(currentMember.privateNotes || {}).slice(0, 5).map(([courseId, note]) => (
+                <a className="bookmark-row" href={`#/course/${courseId}`} key={courseId}>
+                  <strong>Stage {courseId}</strong>
+                  <span>{String(note || '').slice(0, 120) || 'Catatan kosong'}</span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p>Belum ada catatan. Buka stage dan tulis catatan belajarmu.</p>
+          )}
+        </PixelCard>
+      </section>
+
+
+      <section className="section-block two-column">
+        <PixelCard>
+          <h2>Item Shop Saya</h2>
+          {(currentMember.shopInventory || []).length ? (
+            <div className="compact-list">
+              {(currentMember.shopInventory || []).slice(0, 6).map((item) => (
+                <a className="bookmark-row" href="#/shop" key={`${item.id}-${item.purchasedAt}`}>
+                  <strong>{item.icon} {item.name}</strong>
+                  <span>{item.type} · {item.rarity}</span>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p>Belum ada item shop. Buka Coin Shop untuk menukar koin dengan item kosmetik.</p>
+          )}
+        </PixelCard>
+
+        <PixelCard>
+          <h2>Transaksi Koin</h2>
+          {(currentMember.coinTransactions || []).length ? (
+            <div className="compact-list">
+              {(currentMember.coinTransactions || []).slice(0, 6).map((tx) => (
+                <div className="bookmark-row" key={tx.id}>
+                  <strong>{Number(tx.amount || 0) > 0 ? '+' : ''}{tx.amount} koin</strong>
+                  <span>{tx.description}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>Belum ada transaksi koin.</p>
+          )}
         </PixelCard>
       </section>
 

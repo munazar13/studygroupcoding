@@ -41,6 +41,29 @@ function mergeRewardItems(rewards = [], ownedIds = new Set(), type = 'badge') {
   return Array.from(map.values());
 }
 
+function normalizeChestForView(chest, index = 0) {
+  if (typeof chest === 'string') {
+    return {
+      id: chest,
+      chestId: chest,
+      title: chest.replace(/[-_]+/g, ' '),
+      rarity: 'common',
+      sourceStageTitle: 'Reward lama',
+      icon: '🎁'
+    };
+  }
+
+  return {
+    ...chest,
+    id: String(chest?.id || chest?.chestId || `chest-${index}`),
+    chestId: String(chest?.chestId || chest?.id || `chest-${index}`),
+    title: chest?.title || chest?.name || 'Chest Baru',
+    rarity: chest?.rarity || 'common',
+    sourceStageTitle: chest?.sourceStageTitle || chest?.source || `Stage ${chest?.stageId || '-'}`,
+    icon: chest?.icon || '🎁'
+  };
+}
+
 export default function Rewards() {
   const { currentMember, updateCurrentMember } = useAuth();
   const { showToast } = useToast();
@@ -56,7 +79,7 @@ export default function Rewards() {
       .finally(() => setLoading(false));
   }, []);
 
-  const unopenedChests = currentMember?.unopenedChests || [];
+  const unopenedChests = (currentMember?.unopenedChests || []).map(normalizeChestForView);
   const chestHistory = currentMember?.chestHistory || [];
 
   const ownedBadges = useMemo(() => {
@@ -136,7 +159,7 @@ export default function Rewards() {
           {unopenedChests.length ? (
             <div className="chest-list">
               {unopenedChests.map((chest) => (
-                <div className="chest-item reward-chest-card" key={chest.id}>
+                <div className="chest-item reward-chest-card" key={chest.id || chest.chestId}>
                   <span className="chest-icon">🎁</span>
 
                   <div>
@@ -150,7 +173,7 @@ export default function Rewards() {
                   <PixelButton
                     type="button"
                     disabled={openingChestId === chest.id}
-                    onClick={() => handleOpenChest(chest.id)}
+                    onClick={() => handleOpenChest(chest.id || chest.chestId)}
                   >
                     {openingChestId === chest.id ? 'Membuka...' : 'Buka'}
                   </PixelButton>

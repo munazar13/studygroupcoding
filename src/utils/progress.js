@@ -65,8 +65,16 @@ export function createStageChest(course) {
 }
 
 export function applyCourseCompletion(member, course) {
-  const completedCourses = new Set(member.completedCourses || []);
-  completedCourses.add(Number(course.id));
+  const courseId = Number(course.id || course.stage || course.order || 0);
+  const completedCourses = new Set(
+    (member.completedCourses || [])
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item) && item > 0)
+  );
+
+  if (courseId > 0) {
+    completedCourses.add(courseId);
+  }
 
   return {
     completedCourses: [...completedCourses],
@@ -75,14 +83,20 @@ export function applyCourseCompletion(member, course) {
 }
 
 export function applyQuizPass(member, course, result) {
-  const stageId = Number(course.id);
-  const passedStages = new Set(member.passedStages || []);
-  const completedStages = new Set(member.completedStages || []);
-  const badges = new Set(member.badges || []);
-  const ownedBadges = new Set(member.ownedBadges || member.badges || []);
-  const titles = new Set(member.titles || []);
-  const ownedTitles = new Set(member.ownedTitles || member.titles || []);
-  const unlockedRewards = new Set(member.unlockedRewards || []);
+  const stageId = Number(course.id || course.stage || course.order || 0);
+  const normalizeStageSet = (items = []) => new Set(
+    items
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item) && item > 0)
+  );
+
+  const passedStages = normalizeStageSet(member.passedStages || []);
+  const completedStages = normalizeStageSet(member.completedStages || []);
+  const badges = new Set((member.badges || []).map(String));
+  const ownedBadges = new Set((member.ownedBadges || member.badges || []).map(String));
+  const titles = new Set((member.titles || []).map(String));
+  const ownedTitles = new Set((member.ownedTitles || member.titles || []).map(String));
+  const unlockedRewards = new Set((member.unlockedRewards || []).map(String));
   const alreadyPassed = passedStages.has(stageId);
 
   const currentStage = Math.max(
@@ -237,9 +251,45 @@ export function applyQuizAttempt(member, course, result) {
   };
 }
 
+function normalizeChestItem(chest, index = 0) {
+  if (!chest) return null;
+
+  if (typeof chest === 'string') {
+    return {
+      id: chest,
+      chestId: chest,
+      title: chest.replace(/[-_]+/g, ' '),
+      description: 'Chest dari data lama.',
+      rarity: 'common',
+      icon: '🎁',
+      opened: false,
+      createdAt: ''
+    };
+  }
+
+  return {
+    ...chest,
+    id: String(chest.id || chest.chestId || `chest-${index}`),
+    chestId: String(chest.chestId || chest.id || `chest-${index}`),
+    title: chest.title || chest.name || 'Chest Baru',
+    description: chest.description || 'Chest reward.',
+    rarity: chest.rarity || 'common',
+    icon: chest.icon || '🎁',
+    opened: chest.opened === true,
+    createdAt: chest.createdAt || ''
+  };
+}
+
 export function openChest(member, chestId) {
-  const unopenedChests = member.unopenedChests || [];
-  const chest = unopenedChests.find((item) => item.id === chestId);
+  const unopenedChests = (member.unopenedChests || [])
+    .map((chest, index) => normalizeChestItem(chest, index))
+    .filter(Boolean);
+
+  const targetId = String(chestId || '');
+  const chest = unopenedChests.find((item) => (
+    String(item.id) === targetId ||
+    String(item.chestId) === targetId
+  ));
 
   if (!chest) {
     return null;
@@ -267,7 +317,8 @@ export function openChest(member, chestId) {
     xpToNextLevel: nextMember.xpToNextLevel,
     totalXp: nextMember.totalXp,
     coins: nextMember.coins,
-    unopenedChests: unopenedChests.filter((item) => item.id !== chestId),
+    unopenedChests: unopenedChests.filter((item) => item.id !== chest.id),
+    openedChests: Array.from(new Set([String(chest.chestId || chest.id), ...(member.openedChests || []).map(String)])),
     chestHistory: [openedItem, ...(member.chestHistory || [])]
   };
 }

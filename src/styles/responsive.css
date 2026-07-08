@@ -1,3 +1,162 @@
+
+@media (max-width: 900px) {
+.learning-admin-layout {
+grid-template-columns: 1fr;
+}
+
+.stage-sidebar {
+position: static;
+max-height: none;
+}
+
+.stage-list {
+max-height: 280px;
+}
+
+.learning-admin-summary {
+grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stage-editor-head {
+flex-direction: column;
+}
+
+.section-title-row {
+align-items: flex-start;
+flex-direction: column;
+}
+}
+
+@media (max-width: 720px) {
+  .stage-reward-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-result-card .big-icon {
+    width: 74px;
+    height: 74px;
+    font-size: 2.5rem;
+  }
+
+  .level-progress-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .reward-reveal-card {
+    display: grid;
+    text-align: center;
+  }
+
+  .reward-reveal-card .big-icon {
+    margin: 0 auto;
+  }
+
+  .reward-chest-card {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .reward-chest-card .chest-icon {
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .profile-header {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .profile-avatar {
+    margin: 0 auto;
+  }
+
+  .profile-active-rewards {
+    justify-content: center;
+  }
+
+  .profile-level-card .level-progress-head {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .challenge-home-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .profile-alert-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 900px) {
+  .member-detail-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .member-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .member-admin-edit-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .member-grant-reward-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .member-filter-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1000px) {
+  .home-announcement-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .home-announcement-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .home-announcement-card {
+    grid-template-columns: 1fr !important;
+  }
+
+  .home-announcement-icon {
+    width: 42px;
+    height: 42px;
+  }
+
+  .admin-announcement-top {
+    flex-direction: column;
+  }
+}
+
+
+/* =========================
+   RESPONSIVE BASE / MOBILE NAVIGATION
+========================= */
+
 @media (max-width: 980px) {
 .hero-section,
 .dashboard-hero,
@@ -496,4 +655,127 @@ width: 225px;
 .top-nav {
   display: none !important;
 }
+}
+
+
+@media (max-width: 720px) {
+  .answer-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-stage-preview-card {
+    padding: 0.8rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .content-report-card .section-title-row,
+  .admin-report-card .section-title-row,
+  .admin-audit-card .section-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .content-report-card .pixel-button,
+  .admin-report-card .pixel-button {
+    width: 100%;
+  }
+}
+
+
+@media (max-width: 720px) {
+  .learning-tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .material-card-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .material-card-head .pixel-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .how-to-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .how-to-grid,
+  .learning-tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pwa-install-box {
+    width: 100%;
+    display: grid;
+  }
+
+  .pwa-install-box .pixel-button,
+  .pwa-install-hint {
+    width: 100%;
+  }
+}
+
+/* Responsive detail untuk halaman Cara Bermain */
+@media (max-width: 980px) {
+  .how-summary-grid,
+  .how-feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .how-rules-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .how-summary-grid,
+  .how-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .how-timeline-card {
+    grid-template-columns: 1fr;
+    padding-right: 1rem;
+  }
+
+  .how-timeline-card .how-to-number {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+
+  .how-timeline-card .how-to-icon {
+    width: 2.8rem;
+    height: 2.8rem;
+  }
+
+  .manual-install-guide {
+    font-size: 0.92rem;
+  }
+}
+
+
+
+@media (max-width: 720px) {
+  .media-asset-row,
+  .mini-row,
+  .admin-list-row {
+    grid-template-columns: 1fr;
+    display: grid;
+    align-items: start;
+  }
+
+  .compact-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .certificate-signature-row {
+    display: grid;
+    gap: 1rem;
+  }
 }
