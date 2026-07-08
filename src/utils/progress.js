@@ -3,6 +3,17 @@ import { addCoinsToMember, addXpToMember } from './levelSystem';
 
 const CHEST_STAGE_NUMBERS = [5, 10, 15, 20, 25, 30, 32];
 
+function createCoinTransaction(type, amount, description, extra = {}) {
+  return {
+    id: `coin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    amount: Number(amount || 0),
+    description: String(description || ''),
+    createdAt: new Date().toISOString(),
+    ...extra
+  };
+}
+
 export function updateStudyStreak(member) {
   const today = todayKey();
   const lastStudyDate = member.lastStudyDate || '';
@@ -199,6 +210,12 @@ export function applyQuizPass(member, course, result) {
     xpToNextLevel: nextMember.xpToNextLevel,
     totalXp: nextMember.totalXp,
     coins: nextMember.coins,
+    coinTransactions: !alreadyPassed && Number(course.coinReward || 20) > 0
+      ? [
+          createCoinTransaction('quiz_pass', Number(course.coinReward || 20), `Lulus ${course.title || `Stage ${stageId}`}`, { stageId }),
+          ...(member.coinTransactions || [])
+        ].slice(0, 120)
+      : member.coinTransactions || [],
     currentStage: nextMember.currentStage,
     passedStages: nextMember.passedStages,
     completedStages: nextMember.completedStages,
@@ -317,6 +334,10 @@ export function openChest(member, chestId) {
     xpToNextLevel: nextMember.xpToNextLevel,
     totalXp: nextMember.totalXp,
     coins: nextMember.coins,
+    coinTransactions: [
+      createCoinTransaction('chest_open', rewardCoins, `Buka chest: ${chest.title || chest.chestId}`, { chestId: chest.chestId || chest.id }),
+      ...(member.coinTransactions || [])
+    ].slice(0, 120),
     unopenedChests: unopenedChests.filter((item) => item.id !== chest.id),
     openedChests: Array.from(new Set([String(chest.chestId || chest.id), ...(member.openedChests || []).map(String)])),
     chestHistory: [openedItem, ...(member.chestHistory || [])]

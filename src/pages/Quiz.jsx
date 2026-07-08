@@ -118,6 +118,7 @@ export default function Quiz() {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportMessage, setReportMessage] = useState('');
   const [reportSending, setReportSending] = useState(false);
+  const [submittingQuiz, setSubmittingQuiz] = useState(false);
 
   useEffect(() => {
     Promise.all([loadCourse(stageId), loadQuestions(stageId)])
@@ -213,6 +214,8 @@ export default function Quiz() {
   }
 
   async function finishQuiz() {
+  if (submittingQuiz) return;
+
   if (Object.keys(answers).length < questions.length) {
     showToast('Jawab semua soal dulu.', 'error');
     return;
@@ -229,7 +232,9 @@ export default function Quiz() {
     chestStages.includes(stageNumber);
 
   let updatedMember = currentMember;
+  setSubmittingQuiz(true);
 
+  try {
   if (computedResult.passed) {
     updatedMember = await updateCurrentMember((member) =>
       applyQuizPass(member, course, computedResult)
@@ -266,6 +271,12 @@ export default function Quiz() {
     xpToNextLevel: Number(updatedMember?.xpToNextLevel || 100),
     nextStageId: stageNumber + 1
   });
+  } catch (error) {
+    console.error(error);
+    showToast(error.message || 'Gagal menyimpan hasil quiz.', 'error');
+  } finally {
+    setSubmittingQuiz(false);
+  }
 }
 
   if (result) {
@@ -474,7 +485,9 @@ export default function Quiz() {
         {activeIndex < questions.length - 1 ? (
           <PixelButton onClick={() => setActiveIndex((index) => index + 1)}>Lanjut</PixelButton>
         ) : (
-          <PixelButton onClick={finishQuiz}>Selesaikan</PixelButton>
+          <PixelButton onClick={finishQuiz} disabled={submittingQuiz}>
+            {submittingQuiz ? 'Menyimpan...' : 'Selesaikan'}
+          </PixelButton>
         )}
       </div>
 

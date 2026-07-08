@@ -28,6 +28,27 @@ function statusLabel(status) {
   return 'Belum Dikirim';
 }
 
+function getCompletedStageSet(member = {}) {
+  const fromArrays = [
+    ...(member.passedStages || []),
+    ...(member.completedStages || []),
+    ...(member.completedCourses || [])
+  ];
+
+  const fromProgress = Object.entries(member.stageProgress || {})
+    .filter(([, value]) => value?.passed || value?.completed || value?.completedAt)
+    .map(([key]) => key);
+
+  return new Set([...fromArrays, ...fromProgress]
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item) && item > 0));
+}
+
+function formatStageProgress(done, total) {
+  if (!total) return 'Belum ada stage aktif yang bisa dihitung';
+  return `${done}/${total} stage`;
+}
+
 export default function FinalQuest() {
   const { currentMember, refreshMember } = useAuth();
   const { showToast } = useToast();
@@ -36,14 +57,37 @@ export default function FinalQuest() {
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [catalogError, setCatalogError] = useState('');
+  const [submissionError, setSubmissionError] = useState('');
 
   useEffect(() => {
-    Promise.all([
-      loadLearningCatalog(),
-      loadMyFinalProjectSubmission(currentMember.uid)
-    ])
-      .then(([catalog, submissionData]) => {
+    let active = true;
+
+    async function loadFinalProjectPage() {
+      if (!currentMember?.uid) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setCatalogError('');
+      setSubmissionError('');
+
+      try {
+        const catalog = await loadLearningCatalog();
+        if (!active) return;
         setCourses(catalog.courses || []);
+      } catch (error) {
+        console.error('Failed to load final project requirements:', error);
+        if (!active) return;
+        setCatalogError(error?.code === 'permission-denied'
+          ? 'Data stage belum bisa dibaca karena izin Firestore belum sesuai.'
+          : 'Data stage belum bisa dimuat. Coba refresh halaman.');
+      }
+
+      try {
+        const submissionData = await loadMyFinalProjectSubmission(currentMember.uid);
+        if (!active) return;
         setSubmission(submissionData);
         if (submissionData) {
           setForm({
@@ -55,17 +99,48 @@ export default function FinalQuest() {
             note: submissionData.note || ''
           });
         }
-      })
-      .finally(() => setLoading(false));
-  }, [currentMember.uid]);
+      } catch (error) {
+        console.error('Failed to load my final project submission:', error);
+        if (!active) return;
+        setSubmissionError(error?.code === 'permission-denied'
+          ? 'Submission lama belum bisa dibaca. Kamu tetap bisa membuka syarat Final Project setelah rules diperbarui.'
+          : 'Submission lama belum bisa dimuat.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    loadFinalProjectPage();
+
+    return () => {
+      active = false;
+    };
+  }, [currentMember?.uid]);
 
   const requiredStages = useMemo(() => courses.map(getStageNumber).filter(Boolean), [courses]);
-  const passedStages = useMemo(() => new Set([...(currentMember.passedStages || []), ...(currentMember.completedStages || [])].map(Number)), [currentMember]);
-  const completedRequired = requiredStages.filter((stage) => passedStages.has(stage));
-  const unlocked = requiredStages.length > 0 && completedRequired.length >= requiredStages.length;
+  const completedStageSet = useMemo(() => getCompletedStageSet(currentMember), [currentMember]);
+  const completedRequired = requiredStages.filter((stage) => completedStageSet.has(stage));
+  const hasStageRequirement = requiredStages.length > 0;
+  const unlocked = hasStageRequirement && completedRequired.length >= requiredStages.length;
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (!form.title.trim()) {
+      showToast('Judul project wajib diisi.', 'error');
+      return;
+    }
+
+    if (!form.description.trim()) {
+      showToast('Deskripsi project wajib diisi.', 'error');
+      return;
+    }
+
+    if (!form.demoUrl.trim() && !form.githubUrl.trim() && !form.screenshotUrl.trim()) {
+      showToast('Tambahkan minimal satu bukti: link demo, GitHub, atau screenshot.', 'error');
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -89,13 +164,28 @@ export default function FinalQuest() {
 
   if (loading) return <LoadingState />;
 
+  if (catalogError || !hasStageRequirement) {
+    return (
+      <main className="page-shell center-page">
+        <PixelCard className="locked-panel warning-panel">
+          <span className="big-icon">🧭</span>
+          <h1>Final Project Belum Bisa Dihitung</h1>
+          <p>{catalogError || 'Daftar stage aktif belum terbaca, jadi sistem belum bisa menentukan apakah Final Project sudah terbuka.'}</p>
+          <p className="muted-text">Progress kamu: {formatStageProgress(completedRequired.length, requiredStages.length)}.</p>
+          <p>Pastikan Admin sudah membuat stage, stage sudah dipublish, dan aturan Firestore sudah dideploy.</p>
+          <Link className="pixel-button primary" to="/map">Cek Learning Map</Link>
+        </PixelCard>
+      </main>
+    );
+  }
+
   if (!unlocked) {
     return (
       <main className="page-shell center-page">
         <PixelCard className="locked-panel">
           <span className="big-icon">🏰</span>
           <h1>Final Project Terkunci</h1>
-          <p>Selesaikan semua stage dan quiz terlebih dahulu. Progress kamu: {completedRequired.length}/{requiredStages.length || 0} stage.</p>
+          <p>Selesaikan semua stage dan quiz terlebih dahulu. Progress kamu: {formatStageProgress(completedRequired.length, requiredStages.length)}.</p>
           <Link className="pixel-button primary" to="/map">Kembali ke Learning Map</Link>
         </PixelCard>
       </main>
@@ -109,11 +199,20 @@ export default function FinalQuest() {
       <section className="page-hero compact-hero">
         <p className="eyebrow">Final Project</p>
         <h1>Tugas Akhir Petualangan Coding</h1>
-        <p>Buat project sederhana sebagai bukti bahwa kamu memahami materi. Admin akan review sebelum sertifikat bisa diterbitkan.</p>
+        <p>Halaman ini adalah tempat anggota memasukkan submission. Form akan terbuka setelah semua stage dan quiz selesai.</p>
+        <p>Setelah kamu klik Kirim Final Project, submission masuk ke tab Final Project di Admin Panel untuk direview.</p>
       </section>
+
+      {submissionError ? (
+        <PixelCard className="warning-panel section-block">
+          <strong>Catatan:</strong> {submissionError}
+        </PixelCard>
+      ) : null}
 
       <section className="two-column">
         <PixelCard>
+          <h2>Kapan Harus Mengirim?</h2>
+          <p>Kirim Final Project setelah peta belajar menunjukkan semua stage selesai. Kamu boleh update submission jika admin meminta revisi.</p>
           <h2>Ketentuan Project</h2>
           <ul className="clean-list">
             <li>Buat website sederhana, landing page, profil, katalog UMKM, atau mini app sesuai kemampuan.</li>

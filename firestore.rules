@@ -32,7 +32,14 @@ service cloud.firestore {
     function isApproved() {
       return signedIn()
         && exists(memberPath(request.auth.uid))
-        && myMember().data.status == 'approved';
+        && (
+          myMember().data.status == 'approved'
+          || myMember().data.status == 'active'
+        );
+    }
+
+    function canReadLearningContent() {
+      return isAdmin() || isApproved();
     }
 
     function isOwner(uid) {
@@ -47,7 +54,7 @@ service cloud.firestore {
         && request.resource.data.status == resource.data.status
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'name', 'cohort', 'avatar',
+          'name', 'cohort', 'avatar', 'recoveryEmail', 'email',
           'level', 'xp', 'xpToNextLevel', 'totalXp', 'coins', 'streak',
           'currentStage', 'completedCourses', 'completedStages', 'passedStages', 'stageProgress',
           'badges', 'titles', 'frames', 'avatars',
@@ -59,7 +66,8 @@ service cloud.firestore {
           'finalQuestComplete', 'certificateCode', 'lastStudyDate',
           'schemaVersion', 'updatedAt', 'materialBookmarks', 'privateNotes',
           'ownedShopItems', 'shopInventory', 'shopPurchaseHistory', 'notifications',
-          'activeNameColor', 'activeProfileDecoration',
+          'activeNameColor', 'activeNameColorItemId',
+          'activeProfileDecoration', 'activeProfileDecorationItemId',
           'finalProjectStatus', 'finalProjectSubmissionId', 'finalProjectSubmittedAt',
           'finalProjectAdminNote', 'finalProjectReviewedAt', 'finalProjectApprovedAt',
           'certificateStatus', 'certificateIssuedAt', 'certificateRevokedAt'
@@ -67,6 +75,43 @@ service cloud.firestore {
     }
 
 
+
+
+    function isMyFinalProjectDocumentId(id) {
+      return signedIn() && id == 'final-project-' + request.auth.uid;
+    }
+
+    function safeFinalProjectCreate(id) {
+      return isApproved()
+        && isMyFinalProjectDocumentId(id)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.id == id
+        && (
+          request.resource.data.status == 'submitted'
+          || request.resource.data.status == 'pending'
+        );
+    }
+
+    function safeFinalProjectOwnerUpdate(id) {
+      return isApproved()
+        && isMyFinalProjectDocumentId(id)
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.id == id
+        && resource.data.status != 'approved'
+        && resource.data.status != 'rejected'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'memberName', 'nim',
+          'title', 'description', 'demoUrl', 'githubUrl', 'screenshotUrl',
+          'note', 'status', 'updatedAt', 'submittedAt', 'schemaVersion'
+        ])
+        && (
+          request.resource.data.status == 'submitted'
+          || request.resource.data.status == 'pending'
+          || request.resource.data.status == 'revision'
+        );
+    }
 
     match /nimIndex/{nim} {
       allow read: if true;
@@ -99,17 +144,17 @@ service cloud.firestore {
     }
 
     match /rewards/{id} {
-      allow read: if isApproved() || isAdmin();
+      allow read: if canReadLearningContent();
       allow write: if isAdmin();
     }
 
     match /courseSections/{id} {
-      allow read: if isApproved() || isAdmin();
+      allow read: if canReadLearningContent();
       allow write: if isAdmin();
     }
 
     match /questions/{id} {
-      allow read: if isApproved() || isAdmin();
+      allow read: if canReadLearningContent();
       allow write: if isAdmin();
     }
 
@@ -163,15 +208,25 @@ service cloud.firestore {
 
 
     match /shopItems/{id} {
-      allow read: if isApproved() || isAdmin();
+      allow read: if canReadLearningContent();
       allow write: if isAdmin();
     }
 
     match /finalProjectSubmissions/{id} {
-      allow create: if isApproved()
-        && request.resource.data.uid == request.auth.uid;
-      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update: if isAdmin() || (isApproved() && resource.data.uid == request.auth.uid && request.resource.data.uid == request.auth.uid);
+      // Direct get() must be allowed by predictable owner document ID, even when
+      // the submission document does not exist yet. Without this, FinalQuest can
+      // fail before the member has ever submitted a project.
+      allow get: if isAdmin()
+        || isMyFinalProjectDocumentId(id)
+        || (signedIn() && resource.data.uid == request.auth.uid);
+
+      // Owner list/query is still limited by uid-based rules. The app queries with
+      // where('uid', '==', request.auth.uid) as a fallback.
+      allow list: if isAdmin()
+        || (isApproved() && resource.data.uid == request.auth.uid);
+
+      allow create: if safeFinalProjectCreate(id);
+      allow update: if isAdmin() || safeFinalProjectOwnerUpdate(id);
       allow delete: if isAdmin();
     }
 

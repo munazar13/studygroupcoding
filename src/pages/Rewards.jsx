@@ -85,14 +85,16 @@ export default function Rewards() {
   const ownedBadges = useMemo(() => {
     return new Set([
       ...(currentMember?.badges || []),
-      ...(currentMember?.ownedBadges || [])
+      ...(currentMember?.ownedBadges || []),
+      ...((currentMember?.shopInventory || []).filter((item) => item?.type === 'badge').map((item) => item.id))
     ].map((item) => String(item)));
   }, [currentMember]);
 
   const ownedTitles = useMemo(() => {
     return new Set([
       ...(currentMember?.titles || []),
-      ...(currentMember?.ownedTitles || [])
+      ...(currentMember?.ownedTitles || []),
+      ...((currentMember?.shopInventory || []).filter((item) => item?.type === 'title').map((item) => item.id))
     ].map((item) => String(item)));
   }, [currentMember]);
 
@@ -104,6 +106,7 @@ export default function Rewards() {
   }
 
   async function handleOpenChest(chestId) {
+    if (openingChestId) return;
     setOpeningChestId(chestId);
 
     try {
@@ -172,7 +175,7 @@ export default function Rewards() {
 
                   <PixelButton
                     type="button"
-                    disabled={openingChestId === chest.id}
+                    disabled={Boolean(openingChestId)}
                     onClick={() => handleOpenChest(chest.id || chest.chestId)}
                   >
                     {openingChestId === chest.id ? 'Membuka...' : 'Buka'}

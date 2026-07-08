@@ -651,11 +651,12 @@ export async function loadPublicData() {
 }
 
 export async function loadLearningData() {
-  const [courses, rewards, ranks, members] = await Promise.all([
+  const [courses, rewards, ranks, members, shopItems] = await Promise.all([
     getCollection('courses'),
     getCollection('rewards'),
     getCollection('ranks'),
-    getCollection('members')
+    getCollection('members'),
+    getCollection('shopItems')
   ]);
 
   const publishedCourses = courses
@@ -671,7 +672,13 @@ export async function loadLearningData() {
         .filter(Boolean)
     ),
     ranks: ranks.length ? sortByOrder(ranks) : seedRanks,
-    members
+    members,
+    shopItems: sortByOrder(
+      shopItems
+        .map(normalizeShopItem)
+        .filter(Boolean)
+        .filter((item) => item.archived !== true)
+    )
   };
 }
 
@@ -1281,6 +1288,13 @@ export async function resetMemberEconomy(member) {
   const payload = {
     coins: 0,
     coinTransactions: [],
+    ownedShopItems: [],
+    shopInventory: [],
+    shopPurchaseHistory: [],
+    activeNameColor: '',
+    activeNameColorItemId: '',
+    activeProfileDecoration: '',
+    activeProfileDecorationItemId: '',
     updatedAt: new Date().toISOString()
   };
 
@@ -1350,7 +1364,9 @@ export async function cleanMemberData(member) {
     shopPurchaseHistory: Array.isArray(member.shopPurchaseHistory) ? member.shopPurchaseHistory : [],
     notifications: Array.isArray(member.notifications) ? member.notifications : [],
     activeNameColor: String(member.activeNameColor || ''),
+    activeNameColorItemId: String(member.activeNameColorItemId || ''),
     activeProfileDecoration: String(member.activeProfileDecoration || ''),
+    activeProfileDecorationItemId: String(member.activeProfileDecorationItemId || ''),
     finalProjectStatus: String(member.finalProjectStatus || ''),
     certificateStatus: String(member.certificateStatus || ''),
     updatedAt: new Date().toISOString()
@@ -1626,6 +1642,15 @@ function normalizeShopItem(item = {}) {
   const type = String(item.type || 'avatar').trim();
   const name = String(item.name || item.title || '').trim();
   const id = String(item.id || createSafeId(name || type, `shop-${type}`)).trim();
+  const defaultIcon = type === 'frame'
+    ? '🖼️'
+    : type === 'title'
+      ? '🎖️'
+      : type === 'badge'
+        ? '🏅'
+        : type === 'nameColor'
+          ? '🎨'
+          : '🧙';
 
   return {
     ...item,
@@ -1633,12 +1658,13 @@ function normalizeShopItem(item = {}) {
     type,
     name,
     title: name,
-    icon: String(item.icon || (type === 'frame' ? '🖼️' : type === 'title' ? '🎖️' : type === 'badge' ? '🏅' : '🧙')).trim(),
+    icon: String(item.icon || defaultIcon).trim(),
     color: String(item.color || '').trim(),
     description: String(item.description || '').trim(),
     price: Math.max(0, asNumber(item.price, 0)),
     rarity: normalizeRarity(item.rarity || 'common'),
     published: item.published !== false,
+    archived: item.archived === true,
     order: asNumber(item.order, 999),
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -1654,8 +1680,78 @@ export async function loadShopItems(options = {}) {
     items
       .map(normalizeShopItem)
       .filter(Boolean)
-      .filter((item) => includeDrafts || item.published !== false)
+      .filter((item) => includeDrafts || (item.published !== false && item.archived !== true))
   );
+}
+
+function isValidHexColor(color) {
+  const cleanColor = String(color || '').trim();
+  if (!cleanColor) return false;
+  return /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(cleanColor);
+}
+
+function findOwnedShopInventoryItem(member = {}, itemId = '') {
+  const cleanId = String(itemId || '').trim();
+  if (!cleanId) return null;
+  return (Array.isArray(member.shopInventory) ? member.shopInventory : [])
+    .find((entry) => String(entry?.id || '').trim() === cleanId) || null;
+}
+
+async function loadLatestMemberForShop(member) {
+  const uid = getMemberUid(member);
+  return (await getDocument('members', uid)) || member;
+}
+
+async function loadLatestShopItem(item) {
+  const normalized = normalizeShopItem(item);
+  const latest = normalized.id ? await getDocument('shopItems', normalized.id) : null;
+  return normalizeShopItem(latest || normalized);
+}
+
+function createShopInventorySnapshot(item = {}) {
+  return {
+    id: item.id,
+    type: item.type,
+    name: item.name,
+    title: item.title || item.name,
+    icon: item.icon,
+    color: item.color || '',
+    rarity: item.rarity,
+    purchasedAt: new Date().toISOString()
+  };
+}
+
+function createEquipPatchForShopItem(member = {}, item = {}, force = true) {
+  const patch = {};
+
+  if (item.type === 'avatar' && (force || !member.activeAvatar)) {
+    patch.activeAvatar = item.id;
+    patch.avatar = item.icon || member.avatar || '🧑‍💻';
+  }
+
+  if (item.type === 'frame' && (force || !member.activeFrame)) {
+    patch.activeFrame = item.id;
+  }
+
+  if (item.type === 'title' && (force || !member.activeTitle)) {
+    patch.activeTitle = item.id;
+  }
+
+  if (item.type === 'badge' && (force || !member.activeBadge)) {
+    patch.activeBadge = item.id;
+  }
+
+  if (item.type === 'nameColor') {
+    patch.activeNameColorItemId = item.id;
+    patch.activeNameColor = item.color || '';
+  }
+
+  if (item.type === 'profileDecoration') {
+    patch.activeProfileDecorationItemId = item.id;
+    patch.activeProfileDecoration = item.id;
+  }
+
+  return patch;
 }
 
 export async function upsertShopItem(item) {
@@ -1673,6 +1769,10 @@ export async function upsertShopItem(item) {
     throw new Error('Harga item tidak boleh minus.');
   }
 
+  if (normalized.type === 'nameColor' && !isValidHexColor(normalized.color)) {
+    throw new Error('Warna nama wajib memakai format HEX, contoh #ff0000.');
+  }
+
   await setDocument('shopItems', normalized.id, normalized);
   await createAuditLog('shop_item.upsert', `Item shop ${normalized.name} diperbarui.`, { itemId: normalized.id, type: normalized.type });
   return normalized;
@@ -1682,8 +1782,14 @@ export async function deleteShopItem(itemId) {
   const id = String(itemId || '').trim();
   if (!id) throw new Error('Item shop tidak valid.');
 
-  await deleteDocument('shopItems', id);
-  await createAuditLog('shop_item.delete', `Item shop ${id} dihapus.`, { itemId: id });
+  await setDocument('shopItems', id, {
+    id,
+    published: false,
+    archived: true,
+    archivedAt: new Date().toISOString(),
+    schemaVersion: APP_SCHEMA_VERSION
+  });
+  await createAuditLog('shop_item.archive', `Item shop ${id} diarsipkan dari toko.`, { itemId: id });
 }
 
 function normalizeOwnedShopItems(items = []) {
@@ -1705,40 +1811,35 @@ export function memberOwnsShopItem(member = {}, item = {}) {
   const itemId = String(item.id || '').trim();
   if (!itemId) return false;
 
-  return normalizeOwnedShopItems(member.ownedShopItems || []).includes(itemId);
+  return normalizeOwnedShopItems(member.ownedShopItems || []).includes(itemId)
+    || Boolean(findOwnedShopInventoryItem(member, itemId));
 }
 
 export async function purchaseShopItem(member, item) {
   const uid = getMemberUid(member);
-  const normalizedItem = normalizeShopItem(item);
+  const latestMember = await loadLatestMemberForShop(member);
+  const normalizedItem = await loadLatestShopItem(item);
 
-  if (!normalizedItem.published) {
+  if (!normalizedItem.published || normalizedItem.archived) {
     throw new Error('Item shop ini belum tersedia.');
   }
 
-  if (memberOwnsShopItem(member, normalizedItem)) {
+  if (memberOwnsShopItem(latestMember, normalizedItem)) {
     throw new Error('Item ini sudah kamu miliki.');
   }
 
-  const currentCoins = asNumber(member.coins, 0);
+  const currentCoins = asNumber(latestMember.coins, 0);
   const price = asNumber(normalizedItem.price, 0);
 
   if (currentCoins < price) {
     throw new Error('Koin kamu belum cukup untuk membeli item ini.');
   }
 
-  const ownedShopItems = normalizeOwnedShopItems([...(member.ownedShopItems || []), normalizedItem.id]);
+  const ownedShopItems = normalizeOwnedShopItems([...(latestMember.ownedShopItems || []), normalizedItem.id]);
   const shopInventory = [
-    {
-      id: normalizedItem.id,
-      type: normalizedItem.type,
-      name: normalizedItem.name,
-      icon: normalizedItem.icon,
-      color: normalizedItem.color || '',
-      rarity: normalizedItem.rarity,
-      purchasedAt: new Date().toISOString()
-    },
-    ...(Array.isArray(member.shopInventory) ? member.shopInventory : []).filter((entry) => String(entry.id) !== normalizedItem.id)
+    createShopInventorySnapshot(normalizedItem),
+    ...(Array.isArray(latestMember.shopInventory) ? latestMember.shopInventory : [])
+      .filter((entry) => String(entry.id) !== normalizedItem.id)
   ];
 
   const patch = {
@@ -1754,73 +1855,50 @@ export async function purchaseShopItem(member, item) {
         price,
         purchasedAt: new Date().toISOString()
       },
-      ...(member.shopPurchaseHistory || [])
+      ...(latestMember.shopPurchaseHistory || [])
     ].slice(0, 100),
     coinTransactions: [
       createCoinTransaction('shop_purchase', -price, `Beli item: ${normalizedItem.name}`, { itemId: normalizedItem.id }),
-      ...(member.coinTransactions || [])
-    ].slice(0, 120)
+      ...(latestMember.coinTransactions || [])
+    ].slice(0, 120),
+    ...createEquipPatchForShopItem(latestMember, normalizedItem, false)
   };
 
   if (normalizedItem.type === 'badge') {
-    patch.ownedBadges = makeUniqueList([...(member.ownedBadges || member.badges || []), normalizedItem.id]);
-    patch.badges = makeUniqueList([...(member.badges || []), normalizedItem.id]);
+    patch.ownedBadges = makeUniqueList([...(latestMember.ownedBadges || latestMember.badges || []), normalizedItem.id]);
+    patch.badges = makeUniqueList([...(latestMember.badges || []), normalizedItem.id]);
   }
 
   if (normalizedItem.type === 'title') {
-    patch.ownedTitles = makeUniqueList([...(member.ownedTitles || member.titles || []), normalizedItem.id]);
-    patch.titles = makeUniqueList([...(member.titles || []), normalizedItem.id]);
+    patch.ownedTitles = makeUniqueList([...(latestMember.ownedTitles || latestMember.titles || []), normalizedItem.id]);
+    patch.titles = makeUniqueList([...(latestMember.titles || []), normalizedItem.id]);
   }
 
   if (normalizedItem.type === 'avatar') {
-    patch.ownedAvatars = makeUniqueList([...(member.ownedAvatars || member.avatars || []), normalizedItem.id]);
-    patch.avatars = makeUniqueList([...(member.avatars || []), normalizedItem.id]);
+    patch.ownedAvatars = makeUniqueList([...(latestMember.ownedAvatars || latestMember.avatars || []), normalizedItem.id]);
+    patch.avatars = makeUniqueList([...(latestMember.avatars || []), normalizedItem.id]);
   }
 
   if (normalizedItem.type === 'frame') {
-    patch.ownedFrames = makeUniqueList([...(member.ownedFrames || member.frames || []), normalizedItem.id]);
-    patch.frames = makeUniqueList([...(member.frames || []), normalizedItem.id]);
+    patch.ownedFrames = makeUniqueList([...(latestMember.ownedFrames || latestMember.frames || []), normalizedItem.id]);
+    patch.frames = makeUniqueList([...(latestMember.frames || []), normalizedItem.id]);
   }
 
   await updateMember(uid, patch);
-  await createActivity(`${member.name || uid} membeli item shop ${normalizedItem.name}.`, 'shop');
+  await createActivity(`${latestMember.name || member.name || uid} membeli item shop ${normalizedItem.name}.`, 'shop');
   return patch;
 }
 
 export async function equipShopItem(member, item) {
   const uid = getMemberUid(member);
-  const normalizedItem = normalizeShopItem(item);
+  const latestMember = await loadLatestMemberForShop(member);
+  const normalizedItem = await loadLatestShopItem(item);
 
-  if (!memberOwnsShopItem(member, normalizedItem)) {
+  if (!memberOwnsShopItem(latestMember, normalizedItem)) {
     throw new Error('Item ini belum kamu miliki.');
   }
 
-  const patch = {};
-
-  if (normalizedItem.type === 'avatar') {
-    patch.activeAvatar = normalizedItem.id;
-    patch.avatar = normalizedItem.icon || member.avatar || '🧑‍💻';
-  }
-
-  if (normalizedItem.type === 'frame') {
-    patch.activeFrame = normalizedItem.id;
-  }
-
-  if (normalizedItem.type === 'title') {
-    patch.activeTitle = normalizedItem.id;
-  }
-
-  if (normalizedItem.type === 'badge') {
-    patch.activeBadge = normalizedItem.id;
-  }
-
-  if (normalizedItem.type === 'nameColor') {
-    patch.activeNameColor = normalizedItem.color || normalizedItem.id;
-  }
-
-  if (normalizedItem.type === 'profileDecoration') {
-    patch.activeProfileDecoration = normalizedItem.id;
-  }
+  const patch = createEquipPatchForShopItem(latestMember, normalizedItem, true);
 
   await updateMember(uid, patch);
   return patch;
@@ -1899,8 +1977,26 @@ export async function loadFinalProjectSubmissions() {
 
 export async function loadMyFinalProjectSubmission(uid) {
   if (!uid) return null;
-  const submission = await getDocument('finalProjectSubmissions', `final-project-${uid}`);
-  return submission ? normalizeFinalProjectSubmission(submission) : null;
+
+  const expectedId = `final-project-${uid}`;
+
+  try {
+    const submission = await getDocument('finalProjectSubmissions', expectedId);
+    return submission ? normalizeFinalProjectSubmission(submission) : null;
+  } catch (error) {
+    // Firestore can deny a direct get() for an owner-scoped document that does not exist yet
+    // when rules depend on resource.data.uid. The query fallback stays owner-scoped.
+    if (error?.code !== 'permission-denied') {
+      throw error;
+    }
+
+    const submissions = await getCollection('finalProjectSubmissions', {
+      where: [{ field: 'uid', operator: '==', value: uid }]
+    });
+
+    const mine = submissions.find((item) => String(item.id) === expectedId) || submissions[0];
+    return mine ? normalizeFinalProjectSubmission(mine) : null;
+  }
 }
 
 export async function upsertFinalProjectSubmission(submission) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import LoadingState from '../components/LoadingState';
 import PixelButton from '../components/PixelButton';
 import PixelCard from '../components/PixelCard';
@@ -78,6 +78,54 @@ const tabs = [
 { id: 'audit', label: 'Audit Log' },
 { id: 'backup', label: 'Backup' }
 ];
+
+const LEARNING_DRAFT_PREFIX = 'sgc-learning-content-draft-v2';
+
+function getLearningDraftKey(courseId) {
+  const id = String(courseId || '').trim();
+  return id ? `${LEARNING_DRAFT_PREFIX}:${id}` : '';
+}
+
+function readLearningDraft(courseId) {
+  const key = getLearningDraftKey(courseId);
+
+  if (!key || typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (error) {
+    console.warn('Gagal membaca draft konten belajar:', error);
+    return null;
+  }
+}
+
+function writeLearningDraft(courseId, draft) {
+  const key = getLearningDraftKey(courseId);
+
+  if (!key || typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify({
+      ...draft,
+      updatedAt: new Date().toISOString()
+    }));
+  } catch (error) {
+    console.warn('Gagal menyimpan draft lokal konten belajar:', error);
+  }
+}
+
+function removeLearningDraft(courseId) {
+  const key = getLearningDraftKey(courseId);
+
+  if (!key || typeof window === 'undefined') return;
+
+  try {
+    window.localStorage.removeItem(key);
+  } catch (error) {
+    console.warn('Gagal menghapus draft lokal konten belajar:', error);
+  }
+}
 
 
 const emptyCourse = {
@@ -343,6 +391,14 @@ export default function AdminPanel() {
   const [mediaAssets, setMediaAssets] = useState([]);
   const [mediaForm, setMediaForm] = useState({ title: '', dataUrl: '', fileName: '', mimeType: '', size: 0 });
   const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [savingCompleteStage, setSavingCompleteStage] = useState(false);
+  const [savingMaterials, setSavingMaterials] = useState(false);
+  const [savingQuestions, setSavingQuestions] = useState(false);
+  const [materialDirty, setMaterialDirty] = useState(false);
+  const [questionDirty, setQuestionDirty] = useState(false);
+  const [draftNotice, setDraftNotice] = useState('');
+  const sectionFormsCourseRef = useRef('');
+  const questionFormsCourseRef = useRef('');
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [memberEditForm, setMemberEditForm] = useState({
   level: 1,
@@ -490,20 +546,56 @@ const selectedCourse = useMemo(() => {
   return sortedCourses.find((course) => String(course.id) === String(activeCourseId)) || null;
 }, [sortedCourses, activeCourseId]);
 
+function rankSectionCandidate(section, canonicalId, template) {
+  const exactId = String(section?.id || '') === String(canonicalId) ? 1000 : 0;
+  const exactType = String(section?.type || '') === String(template.type) ? 100 : 0;
+  const exactOrder = Number(section?.order || 0) === Number(template.order) ? 10 : 0;
+  const updatedTime = new Date(section?.updatedAt || section?.createdAt || 0).getTime();
+
+  return exactId + exactType + exactOrder + (Number.isFinite(updatedTime) ? updatedTime / 100000000000000 : 0);
+}
+
+function findBestExistingSection(existingSections, canonicalId, template) {
+  const candidates = existingSections.filter((section) => {
+    const sameId = String(section.id || '') === String(canonicalId);
+    const sameType = String(section.type || '') === String(template.type);
+    const sameOrder = Number(section.order || 0) === Number(template.order);
+
+    return sameId || sameType || sameOrder;
+  });
+
+  if (!candidates.length) return null;
+
+  return [...candidates].sort((a, b) =>
+    rankSectionCandidate(b, canonicalId, template) - rankSectionCandidate(a, canonicalId, template)
+  )[0];
+}
+
+function findExistingSectionIdsForSave(allSections, courseId, canonicalId, template) {
+  return allSections
+    .filter((section) => {
+      const sameCourse = String(section.courseId || '') === String(courseId);
+      const sameId = String(section.id || '') === String(canonicalId);
+      const sameType = String(section.type || '') === String(template.type);
+      const sameOrder = Number(section.order || 0) === Number(template.order);
+
+      return sameCourse && (sameId || sameType || sameOrder);
+    })
+    .map((section) => String(section.id || '').trim())
+    .filter(Boolean);
+}
+
 const selectedCourseSections = useMemo(() => {
   const existingSections = contentData.courseSections
     .filter((section) => String(section.courseId) === String(activeCourseId));
 
   return FIXED_MATERIAL_SECTIONS.map((template) => {
-    const existing = existingSections.find((section) => {
-      const sameType = String(section.type || '') === String(template.type);
-      const sameOrder = Number(section.order || 0) === Number(template.order);
-
-      return sameType || sameOrder;
-    });
+    const canonicalId = `section-${activeCourseId}-${template.type}`;
+    const existing = findBestExistingSection(existingSections, canonicalId, template);
 
     return {
-      id: existing?.id || `section-${activeCourseId}-${template.type}`,
+      id: existing?.id || canonicalId,
+      canonicalId,
       courseId: String(activeCourseId || ''),
       order: template.order,
       type: template.type,
@@ -519,21 +611,51 @@ const selectedCourseSections = useMemo(() => {
 
 useEffect(() => {
   if (!activeCourseId) {
+    sectionFormsCourseRef.current = '';
     setSectionForms([]);
+    setMaterialDirty(false);
     return;
   }
 
+  const nextCourseId = String(activeCourseId);
+  const isSameCourse = sectionFormsCourseRef.current === nextCourseId;
+
+  // Jangan timpa materi yang sedang diketik saat reload data Firestore berjalan.
+  // Ini mencegah kasus materi hilang setelah klik simpan info stage / reload otomatis.
+  if (isSameCourse && materialDirty) return;
+
+  const draft = readLearningDraft(nextCourseId);
+  const draftSections = Array.isArray(draft?.sectionForms)
+    && draft.sectionForms.length === FIXED_MATERIAL_SECTIONS.length
+    ? draft.sectionForms
+    : null;
+  const shouldRestoreDraft = !isSameCourse && draftSections && draft?.materialDirty === true;
+
+  sectionFormsCourseRef.current = nextCourseId;
   setSectionForms(
-    selectedCourseSections.map((section) => ({
-      ...section,
-      courseId: String(activeCourseId),
-      content: section.content || '',
-      code: section.code || '',
-      checkpoint: section.checkpoint || '',
-      published: section.published !== false
-    }))
+    shouldRestoreDraft
+      ? draftSections.map((section) => ({
+          ...section,
+          courseId: nextCourseId,
+          content: section.content || '',
+          code: section.code || '',
+          checkpoint: section.checkpoint || '',
+          published: section.published !== false
+        }))
+      : selectedCourseSections.map((section) => ({
+          ...section,
+          courseId: nextCourseId,
+          content: section.content || '',
+          code: section.code || '',
+          checkpoint: section.checkpoint || '',
+          published: section.published !== false
+        }))
   );
-}, [activeCourseId, selectedCourseSections]);
+  setMaterialDirty(Boolean(shouldRestoreDraft));
+  if (shouldRestoreDraft) {
+    setDraftNotice('Draft materi yang belum tersimpan berhasil dipulihkan dari browser. Klik Simpan Semua Materi atau Simpan Stage Lengkap agar masuk ke database.');
+  }
+}, [activeCourseId, selectedCourseSections, materialDirty]);
 
 const selectedCourseQuestions = useMemo(() => {
   return contentData.questions
@@ -543,33 +665,92 @@ const selectedCourseQuestions = useMemo(() => {
 
 useEffect(() => {
   if (!activeCourseId) {
+    questionFormsCourseRef.current = '';
     setQuestionForms([]);
+    setQuestionDirty(false);
     return;
   }
 
+  const nextCourseId = String(activeCourseId);
+  const isSameCourse = questionFormsCourseRef.current === nextCourseId;
+
+  // Jangan timpa soal yang sedang diketik saat reload data Firestore berjalan.
+  if (isSameCourse && questionDirty) return;
+
+  const draft = readLearningDraft(nextCourseId);
+  const draftQuestions = Array.isArray(draft?.questionForms) && draft.questionForms.length
+    ? draft.questionForms
+    : null;
+  const shouldRestoreDraft = !isSameCourse && draftQuestions && draft?.questionDirty === true;
+
+  questionFormsCourseRef.current = nextCourseId;
   const existingQuestions = selectedCourseQuestions.map((question, index) => ({
     ...questionToForm(question),
-    courseId: String(activeCourseId),
+    courseId: nextCourseId,
     order: question.order || index + 1,
     published: question.published !== false
   }));
 
   setQuestionForms(
-    existingQuestions.length
-      ? existingQuestions
-      : [
-          {
-            ...emptyQuestion,
-            courseId: String(activeCourseId),
-            order: 1,
-            published: true
-          }
-        ]
+    shouldRestoreDraft
+      ? draftQuestions.map((question, index) => ({
+          ...question,
+          courseId: nextCourseId,
+          order: question.order || index + 1,
+          published: question.published !== false
+        }))
+      : existingQuestions.length
+        ? existingQuestions
+        : [
+            {
+              ...emptyQuestion,
+              courseId: nextCourseId,
+              order: 1,
+              published: true
+            }
+          ]
   );
-}, [activeCourseId, selectedCourseQuestions]);
+  setQuestionDirty(Boolean(shouldRestoreDraft));
+  if (shouldRestoreDraft) {
+    setDraftNotice('Draft soal yang belum tersimpan berhasil dipulihkan dari browser. Klik Simpan Semua Soal atau Simpan Stage Lengkap agar masuk ke database.');
+  }
+}, [activeCourseId, selectedCourseQuestions, questionDirty]);
+
+useEffect(() => {
+  if (activeTab !== 'learning-content') return undefined;
+
+  const draftCourseId = getCourseFormId() || activeCourseId;
+
+  if (!draftCourseId || (!materialDirty && !questionDirty)) return undefined;
+
+  const timeoutId = window.setTimeout(() => {
+    writeLearningDraft(draftCourseId, {
+      materialDirty,
+      questionDirty,
+      sectionForms,
+      questionForms
+    });
+  }, 500);
+
+  return () => window.clearTimeout(timeoutId);
+}, [
+  activeTab,
+  activeCourseId,
+  courseForm.id,
+  courseForm.stage,
+  materialDirty,
+  questionDirty,
+  sectionForms,
+  questionForms
+]);
 
 const stageCompleteness = useMemo(() => {
-  const materialStatus = selectedCourseSections.map((section) => {
+  const materialSource = sectionForms.length ? sectionForms : selectedCourseSections;
+  const questionSource = questionForms.length
+    ? questionForms
+    : selectedCourseQuestions.map((question) => questionToForm(question));
+
+  const materialStatus = materialSource.map((section) => {
     const hasContent = String(section.content || '').trim().length > 0;
     const hasCheckpoint = String(section.checkpoint || '').trim().length > 0;
 
@@ -604,8 +785,8 @@ const stageCompleteness = useMemo(() => {
     };
   });
 
-  const questionStatus = selectedCourseQuestions.map((question, index) =>
-    getQuestionFormStatus(questionToForm(question), index)
+  const questionStatus = questionSource.map((question, index) =>
+    getQuestionFormStatus(question, index)
   );
 
   const readyPublishedQuestions = questionStatus.filter((item) => item.complete);
@@ -630,7 +811,7 @@ const stageCompleteness = useMemo(() => {
     xpReward,
     coinReward
   };
-}, [selectedCourseSections, selectedCourseQuestions, courseForm?.xpReward, courseForm?.coinReward]);
+}, [sectionForms, selectedCourseSections, questionForms, selectedCourseQuestions, courseForm?.xpReward, courseForm?.coinReward]);
 
 const masterRewards = useMemo(() => {
   return [...(learningData.rewards || [])].sort((a, b) => {
@@ -818,6 +999,7 @@ function createImageSnippet() {
 
 
 function updateQuestionForms(index, field, value) {
+  setQuestionDirty(true);
   setQuestionForms((current) =>
     current.map((question, questionIndex) =>
       questionIndex === index
@@ -831,6 +1013,7 @@ function updateQuestionForms(index, field, value) {
 }
 
 function appendToQuestionFormFieldAt(index, fieldName, snippet) {
+  setQuestionDirty(true);
   setQuestionForms((current) =>
     current.map((question, questionIndex) => {
       if (questionIndex !== index) return question;
@@ -848,6 +1031,7 @@ ${snippet}` : snippet
 }
 
 function addQuestionForm() {
+  setQuestionDirty(true);
   setQuestionForms((current) => {
     const nextOrder = current.length
       ? Math.max(...current.map((question) => Number(question.order || 0))) + 1
@@ -883,6 +1067,7 @@ async function removeQuestionFormAt(index) {
     try {
       await removeRecord('questions', target.id);
       showToast('Soal berhasil dihapus.');
+      setQuestionDirty(false);
       await reload();
     } catch (error) {
       showToast(error.message || 'Soal gagal dihapus.', 'error');
@@ -891,6 +1076,7 @@ async function removeQuestionFormAt(index) {
     return;
   }
 
+  setQuestionDirty(true);
   setQuestionForms((current) => {
     const nextForms = current.filter((_, questionIndex) => questionIndex !== index);
 
@@ -1294,61 +1480,233 @@ async function handleCleanSelectedMemberData() {
   }
 }
 
-  async function handleCourseSubmit(event) {
-    event.preventDefault();
 
-    if (!validateCourseForm()) return;
+function getCourseFormId() {
+  return String(courseForm.id || courseForm.stage || courseForm.order || activeCourseId || '').trim();
+}
 
-    const id = String(courseForm.id || courseForm.stage || courseForm.order);
-    const wantsPublish = courseForm.published === true;
+function validateSectionFormsForSave({ allowPartial = false } = {}) {
+  if (!sectionForms.length || sectionForms.length !== FIXED_MATERIAL_SECTIONS.length) {
+    showToast('Struktur materi belum lengkap. Muat ulang halaman lalu coba lagi.', 'error');
+    return false;
+  }
 
-    if (wantsPublish) {
-      const incompleteMaterials = stageCompleteness.materialStatus.filter(
-        (item) => !item.complete
-      );
+  const filledSections = sectionForms.filter((section) => {
+    return !isBlank(section.content) || !isBlank(section.checkpoint);
+  });
 
-      const hasQuiz = stageCompleteness.quizComplete;
+  if (allowPartial && !filledSections.length) {
+    showToast('Belum ada isi materi yang bisa disimpan.', 'error');
+    return false;
+  }
 
-      const xpReward = Number(courseForm.xpReward || 0);
-      const coinReward = Number(courseForm.coinReward || 0);
-      const hasReward = xpReward > 0 && coinReward > 0;
+  const sectionsToCheck = allowPartial ? filledSections : sectionForms;
 
-      if (incompleteMaterials.length > 0) {
-        const firstProblem = incompleteMaterials[0];
+  for (const section of sectionsToCheck) {
+    if (isBlank(section.content)) {
+      showToast(`Isi materi "${section.title}" wajib diisi sebelum disimpan.`, 'error');
+      return false;
+    }
 
-        showToast(
-          `Stage belum bisa dipublish. Periksa bagian: ${firstProblem.title} (${firstProblem.message}).`,
-          'error'
-        );
-        return;
-      }
+    if (!allowPartial && isBlank(section.checkpoint)) {
+      showToast(`Checkpoint "${section.title}" wajib diisi.`, 'error');
+      return false;
+    }
+  }
 
-      if (!hasQuiz) {
-        showToast('Stage belum bisa dipublish. Minimal harus ada 1 soal quiz yang lengkap dan published.', 'error');
-        return;
-      }
+  return true;
+}
 
-      if (!hasReward) {
-        showToast('Stage belum bisa dipublish. XP dan coin wajib diisi.', 'error');
-        return;
+function validateQuestionFormsForSave() {
+  if (!questionForms.length) {
+    showToast('Minimal buat 1 soal quiz.', 'error');
+    return false;
+  }
+
+  for (const [index, question] of questionForms.entries()) {
+    const label = `Soal ${index + 1}`;
+
+    if (isBlank(question.question)) {
+      showToast(`${label}: pertanyaan wajib diisi.`, 'error');
+      return false;
+    }
+
+    const options = [question.optionA, question.optionB, question.optionC, question.optionD];
+
+    if (options.some((option) => isBlank(option))) {
+      showToast(`${label}: pilihan A, B, C, dan D wajib diisi.`, 'error');
+      return false;
+    }
+
+    if (![0, 1, 2, 3].includes(Number(question.correctIndex))) {
+      showToast(`${label}: jawaban benar harus A, B, C, atau D.`, 'error');
+      return false;
+    }
+
+    if (isBlank(question.explanation)) {
+      showToast(`${label}: pembahasan jawaban wajib diisi.`, 'error');
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function saveCourseFormOnly({ forceDraftWhenIncomplete = false } = {}) {
+  if (!validateCourseForm()) return null;
+
+  const id = getCourseFormId();
+
+  if (!id) {
+    showToast('ID atau nomor stage wajib diisi.', 'error');
+    return null;
+  }
+
+  const shouldSaveAsDraft = forceDraftWhenIncomplete && courseForm.published === true && !stageCompleteness.complete;
+  const payload = {
+    ...courseForm,
+    id,
+    published: shouldSaveAsDraft ? false : courseForm.published
+  };
+
+  await upsertCourse(payload);
+
+  if (shouldSaveAsDraft) {
+    setCourseForm((current) => ({
+      ...current,
+      published: false
+    }));
+  }
+
+  return { id, savedAsDraft: shouldSaveAsDraft };
+}
+
+async function saveSectionFormsForCourse(courseId, { allowPartial = false } = {}) {
+  if (!courseId) {
+    showToast('Pilih stage terlebih dahulu.', 'error');
+    return { saved: false, count: 0, sections: [] };
+  }
+
+  if (!validateSectionFormsForSave({ allowPartial })) {
+    return { saved: false, count: 0, sections: [] };
+  }
+
+  const sectionsToSave = (allowPartial
+    ? sectionForms.filter((section) => !isBlank(section.content) || !isBlank(section.checkpoint))
+    : sectionForms
+  );
+
+  const savedSections = [];
+  const savedLogicalSections = [];
+
+  for (const section of sectionsToSave) {
+    const template = FIXED_MATERIAL_SECTIONS.find(
+      (item) => item.type === section.type || Number(item.order) === Number(section.order)
+    );
+
+    if (!template) {
+      throw new Error(`Struktur materi "${section.title}" tidak valid.`);
+    }
+
+    const canonicalId = `section-${courseId}-${template.type}`;
+    const targetIds = Array.from(new Set([
+      String(section.id || '').trim(),
+      String(section.canonicalId || '').trim(),
+      canonicalId,
+      ...findExistingSectionIdsForSave(contentData.courseSections, courseId, canonicalId, template)
+    ].filter(Boolean)));
+
+    console.info('[Konten Belajar] Target dokumen materi', {
+      courseId: String(courseId),
+      title: template.title,
+      type: template.type,
+      targetIds
+    });
+
+    let canonicalSaved = null;
+
+    for (const targetId of targetIds) {
+      const savedSection = await upsertCourseSection({
+        ...section,
+        id: targetId,
+        canonicalId,
+        courseId: String(courseId),
+        order: template.order,
+        type: template.type,
+        title: template.title,
+        code: '',
+        checkpoint: section.checkpoint || template.defaultCheckpoint,
+        published: section.published === true
+      });
+
+      savedSections.push(savedSection);
+
+      if (targetId === canonicalId) {
+        canonicalSaved = savedSection;
       }
     }
 
-    try {
-      await upsertCourse({
-        ...courseForm,
-        id
-      });
+    savedLogicalSections.push(canonicalSaved || savedSections[savedSections.length - 1]);
+  }
 
-      setCourseForm(emptyCourse);
-      showToast('Roadmap stage berhasil disimpan.');
-      await reload();
+  return {
+    saved: true,
+    count: savedLogicalSections.length,
+    sections: savedSections,
+    logicalSections: savedLogicalSections
+  };
+}
+
+async function saveQuestionFormsForCourse(courseId) {
+  if (!courseId) {
+    showToast('Pilih stage terlebih dahulu.', 'error');
+    return false;
+  }
+
+  if (!validateQuestionFormsForSave()) return false;
+
+  const timestamp = Date.now();
+
+  await Promise.all(
+    questionForms.map((question, index) =>
+      upsertQuestion({
+        ...question,
+        id: question.id || `question-${courseId}-${timestamp}-${index + 1}`,
+        courseId,
+        order: index + 1,
+        correctIndex: Number(question.correctIndex || 0),
+        published: question.published === true
+      })
+    )
+  );
+
+  return true;
+}
+
+  async function handleCourseSubmit(event) {
+    event.preventDefault();
+
+    try {
+      const result = await saveCourseFormOnly({ forceDraftWhenIncomplete: true });
+
+      if (!result) return;
+
+      showToast(result.savedAsDraft
+        ? 'Info stage berhasil disimpan sebagai draft karena materi/soal belum lengkap. Materi dan soal di form tetap aman.'
+        : 'Info stage berhasil disimpan. Materi dan soal di form tetap aman. Klik Simpan Stage Lengkap di bagian akhir untuk menyimpan semuanya.'
+      );
+
+      if (!selectedCourse || String(selectedCourse.id) !== String(result.id)) {
+        setSelectedCourseId(result.id);
+        await reload();
+      }
     } catch (error) {
       showToast(error.message || 'Roadmap gagal disimpan.', 'error');
     }
   }
 
   function updateSectionForms(index, field, value) {
+  setMaterialDirty(true);
   setSectionForms((current) =>
     current.map((section, sectionIndex) =>
       sectionIndex === index
@@ -1362,6 +1720,7 @@ async function handleCleanSelectedMemberData() {
 }
 
 function appendToSectionContentAt(index, snippet) {
+  setMaterialDirty(true);
   setSectionForms((current) =>
     current.map((section, sectionIndex) => {
       if (sectionIndex !== index) return section;
@@ -1377,59 +1736,65 @@ function appendToSectionContentAt(index, snippet) {
 async function handleAllSectionsSubmit(event) {
   event.preventDefault();
 
-  if (!activeCourseId) {
-    showToast('Pilih stage terlebih dahulu.', 'error');
+  if (savingMaterials) return;
+
+  const courseId = String(selectedCourse?.id || activeCourseId || getCourseFormId() || '').trim();
+
+  if (!courseId) {
+    showToast('Pilih stage yang mau diedit, lalu coba simpan materi lagi.', 'error');
     return;
   }
 
-  if (sectionForms.length !== FIXED_MATERIAL_SECTIONS.length) {
-    showToast('Struktur materi belum lengkap. Muat ulang halaman lalu coba lagi.', 'error');
-    return;
-  }
-
-  for (const section of sectionForms) {
-    if (isBlank(section.content)) {
-      showToast(`Isi materi "${section.title}" wajib diisi.`, 'error');
-      return;
-    }
-
-    if (isBlank(section.checkpoint)) {
-      showToast(`Checkpoint "${section.title}" wajib diisi.`, 'error');
-      return;
-    }
-  }
+  setSavingMaterials(true);
 
   try {
-    const courseId = String(activeCourseId);
+    console.info('[Konten Belajar] Simpan materi dimulai', {
+      courseId,
+      totalForms: sectionForms.length,
+      filledForms: sectionForms.filter((section) => !isBlank(section.content) || !isBlank(section.checkpoint)).length
+    });
 
-    await Promise.all(
-      sectionForms.map((section) => {
-        const template = FIXED_MATERIAL_SECTIONS.find(
-          (item) => item.type === section.type
-        );
+    const result = await saveSectionFormsForCourse(courseId, { allowPartial: true });
 
-        if (!template) {
-          throw new Error(`Struktur materi "${section.title}" tidak valid.`);
-        }
+    if (!result.saved) return;
 
-        return upsertCourseSection({
-          ...section,
-          id: `section-${courseId}-${template.type}`,
-          courseId,
-          order: template.order,
-          type: template.type,
-          title: template.title,
-          code: '',
-          checkpoint: section.checkpoint || template.defaultCheckpoint,
-          published: section.published === true
-        });
-      })
-    );
+    const savedSectionIds = new Set(result.sections.map((section) => String(section.id)));
 
-    showToast('Semua materi berhasil disimpan.');
+    setContentData((current) => ({
+      ...current,
+      courseSections: [
+        ...current.courseSections.filter((section) => !savedSectionIds.has(String(section.id))),
+        ...result.sections
+      ]
+    }));
+
+    const keepQuestionDraft = questionDirty;
+    sectionFormsCourseRef.current = String(courseId);
+    setSelectedCourseId(courseId);
+    setMaterialDirty(false);
+
+    if (keepQuestionDraft) {
+      writeLearningDraft(courseId, {
+        materialDirty: false,
+        questionDirty: true,
+        sectionForms,
+        questionForms
+      });
+    } else {
+      removeLearningDraft(courseId);
+    }
+
+    showToast(`${result.count} materi berhasil disimpan ke Stage ${courseId}.`);
     await reload();
   } catch (error) {
-    showToast(error.message || 'Gagal menyimpan semua materi.', 'error');
+    console.error('[Konten Belajar] Gagal menyimpan materi:', error);
+    const code = String(error?.code || '');
+    const message = code.includes('permission') || String(error?.message || '').toLowerCase().includes('permission')
+      ? 'Gagal menyimpan materi karena akun ini belum diizinkan write oleh Firestore Rules. Pastikan login admin benar dan rules terbaru sudah dipublish.'
+      : (error.message || 'Gagal menyimpan semua materi.');
+    showToast(message, 'error');
+  } finally {
+    setSavingMaterials(false);
   }
 }
 
@@ -1437,62 +1802,87 @@ async function handleAllSectionsSubmit(event) {
 async function handleAllQuestionsSubmit(event) {
   event.preventDefault();
 
-  if (!activeCourseId) {
-    showToast('Pilih stage terlebih dahulu.', 'error');
+  if (savingQuestions) return;
+
+  const courseId = String(selectedCourse?.id || activeCourseId || getCourseFormId() || '').trim();
+
+  if (!courseId) {
+    showToast('Pilih stage yang mau diedit, lalu coba simpan soal lagi.', 'error');
     return;
   }
 
-  if (!questionForms.length) {
-    showToast('Minimal buat 1 soal quiz.', 'error');
-    return;
-  }
-
-  for (const [index, question] of questionForms.entries()) {
-    const label = `Soal ${index + 1}`;
-
-    if (isBlank(question.question)) {
-      showToast(`${label}: pertanyaan wajib diisi.`, 'error');
-      return;
-    }
-
-    const options = [question.optionA, question.optionB, question.optionC, question.optionD];
-
-    if (options.some((option) => isBlank(option))) {
-      showToast(`${label}: pilihan A, B, C, dan D wajib diisi.`, 'error');
-      return;
-    }
-
-    if (![0, 1, 2, 3].includes(Number(question.correctIndex))) {
-      showToast(`${label}: jawaban benar harus A, B, C, atau D.`, 'error');
-      return;
-    }
-
-    if (isBlank(question.explanation)) {
-      showToast(`${label}: pembahasan jawaban wajib diisi.`, 'error');
-      return;
-    }
-  }
+  setSavingQuestions(true);
 
   try {
-    const courseId = String(activeCourseId);
+    const saved = await saveQuestionFormsForCourse(courseId);
 
-    await Promise.all(
-      questionForms.map((question, index) =>
-        upsertQuestion({
-          ...question,
-          id: question.id || `question-${courseId}-${Date.now()}-${index + 1}`,
-          courseId,
-          order: index + 1,
-          correctIndex: Number(question.correctIndex || 0),
-          published: question.published === true
-        })
-      )
-    );
+    if (!saved) return;
 
-    showToast('Semua soal berhasil disimpan.');
+    const keepMaterialDraft = materialDirty;
+    questionFormsCourseRef.current = String(courseId);
+    setSelectedCourseId(courseId);
+    setQuestionDirty(false);
+
+    if (keepMaterialDraft) {
+      writeLearningDraft(courseId, {
+        materialDirty: true,
+        questionDirty: false,
+        sectionForms,
+        questionForms
+      });
+    } else {
+      removeLearningDraft(courseId);
+    }
+
+    showToast(`Semua soal berhasil disimpan ke Stage ${courseId}.`);
     await reload();
   } catch (error) {
+    console.error('[Konten Belajar] Gagal menyimpan soal:', error);
     showToast(error.message || 'Gagal menyimpan semua soal.', 'error');
+  } finally {
+    setSavingQuestions(false);
+  }
+}
+
+async function handleCompleteStageSave() {
+  if (savingCompleteStage) return;
+
+  if (!validateCourseForm()) return;
+  if (!validateSectionFormsForSave()) return;
+  if (!validateQuestionFormsForSave()) return;
+
+  const xpReward = Number(courseForm.xpReward || 0);
+  const coinReward = Number(courseForm.coinReward || 0);
+
+  if (xpReward <= 0 || coinReward <= 0) {
+    showToast('XP dan koin reward wajib lebih dari 0 sebelum stage disimpan lengkap.', 'error');
+    return;
+  }
+
+  setSavingCompleteStage(true);
+
+  try {
+    const result = await saveCourseFormOnly();
+
+    if (!result) return;
+
+    const courseId = result.id;
+
+    await saveSectionFormsForCourse(courseId);
+    await saveQuestionFormsForCourse(courseId);
+
+    sectionFormsCourseRef.current = String(courseId);
+    questionFormsCourseRef.current = String(courseId);
+    setMaterialDirty(false);
+    setQuestionDirty(false);
+    removeLearningDraft(courseId);
+    setSelectedCourseId(courseId);
+    showToast('Stage lengkap berhasil disimpan: info stage, 6 materi, dan semua soal quiz sudah aman.');
+    await reload();
+  } catch (error) {
+    showToast(error.message || 'Gagal menyimpan stage lengkap.', 'error');
+  } finally {
+    setSavingCompleteStage(false);
   }
 }
 
@@ -1771,8 +2161,8 @@ function handleEditShopItem(item) {
 
 async function handleDeleteShopItem(itemId) {
   const confirmed = confirmDangerAction({
-    title: 'Hapus item shop',
-    message: `Item shop ${itemId} akan dihapus dari toko.`,
+    title: 'Arsipkan item shop',
+    message: `Item shop ${itemId} akan diarsipkan dari toko. Data pembelian user lama tetap aman.`,
     confirmation: 'DELETE'
   });
 
@@ -1780,10 +2170,10 @@ async function handleDeleteShopItem(itemId) {
 
   try {
     await deleteShopItem(itemId);
-    showToast('Item shop berhasil dihapus.');
+    showToast('Item shop berhasil diarsipkan.');
     await reload();
   } catch (error) {
-    showToast(error.message || 'Gagal menghapus item shop.', 'error');
+    showToast(error.message || 'Gagal mengarsipkan item shop.', 'error');
   }
 }
 
@@ -2665,6 +3055,14 @@ async function handleDeleteMedia(assetId) {
               </div>
             </div>
 
+            {draftNotice ? (
+              <div className="admin-save-alert">
+                <strong>Draft lokal aktif</strong>
+                <p>{draftNotice}</p>
+                <button type="button" onClick={() => setDraftNotice('')}>Tutup</button>
+              </div>
+            ) : null}
+
             <div className="content-editor-section">
   <div className="section-title-row">
     <h3>Edit Stage</h3>
@@ -2990,7 +3388,7 @@ async function handleDeleteMedia(assetId) {
     </label>
 
     <div className="member-actions">
-      <PixelButton type="submit">Simpan Stage</PixelButton>
+      <PixelButton type="submit">Simpan Info Stage Saja</PixelButton>
       <PixelButton
         type="button"
         variant="secondary"
@@ -2999,6 +3397,10 @@ async function handleDeleteMedia(assetId) {
         Kosongkan Form
       </PixelButton>
     </div>
+
+    <p className="form-help warning-help">
+      Tombol ini hanya menyimpan informasi stage. Materi dan soal tidak akan hilang saat diklik, tetapi belum tersimpan sampai kamu klik Simpan Semua Materi, Simpan Semua Soal, atau Simpan Stage Lengkap di akhir.
+    </p>
   </form>
 </div>
 
@@ -3107,9 +3509,9 @@ async function handleDeleteMedia(assetId) {
     </div>
   </details>
 
-  <form className="form-stack" onSubmit={handleAllSectionsSubmit}>
+  <form className="form-stack" onSubmit={handleAllSectionsSubmit} noValidate>
   <p className="form-help">
-    Semua stage memiliki 6 bagian materi tetap. Edit seluruh bagian di bawah ini, lalu klik Simpan Semua Materi.
+    Semua stage memiliki 6 bagian materi tetap. Tombol ini menyimpan materi langsung ke stage yang sedang dipilih. Kamu boleh menyimpan bertahap walaupun belum semua bagian selesai, agar tulisan panjang tidak hilang.
   </p>
 
   {sectionForms.map((section, index) => (
@@ -3197,8 +3599,8 @@ async function handleDeleteMedia(assetId) {
   ))}
 
   <div className="member-actions">
-    <PixelButton type="submit">
-      Simpan Semua Materi
+    <PixelButton type="submit" disabled={savingMaterials}>
+      {savingMaterials ? 'Menyimpan Materi...' : 'Simpan Semua Materi'}
     </PixelButton>
   </div>
 </form>
@@ -3237,9 +3639,9 @@ async function handleDeleteMedia(assetId) {
     <span>{questionForms.length} soal di form</span>
   </div>
 
-  <form className="form-stack" onSubmit={handleAllQuestionsSubmit}>
+  <form className="form-stack" onSubmit={handleAllQuestionsSubmit} noValidate>
     <p className="form-help">
-      Edit semua soal quiz stage ini sekaligus. Tambah soal jika perlu, lalu klik Simpan Semua Soal.
+      Edit semua soal quiz stage ini sekaligus. Tombol ini menyimpan soal langsung ke stage yang sedang dipilih. Untuk publish final yang lengkap, gunakan Simpan Stage Lengkap di bagian bawah.
     </p>
 
     {questionForms.map((question, index) => (
@@ -3488,8 +3890,8 @@ async function handleDeleteMedia(assetId) {
     ))}
 
     <div className="member-actions">
-      <PixelButton type="submit">
-        Simpan Semua Soal
+      <PixelButton type="submit" disabled={savingQuestions}>
+        {savingQuestions ? 'Menyimpan Soal...' : 'Simpan Semua Soal'}
       </PixelButton>
 
       <PixelButton
@@ -3501,6 +3903,22 @@ async function handleDeleteMedia(assetId) {
       </PixelButton>
     </div>
   </form>
+
+  <div className="complete-stage-save-panel">
+    <div>
+      <p className="eyebrow">Simpan Final</p>
+      <h3>Simpan Stage Lengkap</h3>
+      <p>Gunakan tombol ini setelah info stage, 6 materi, dan semua soal sudah diisi. Sekali klik akan menyimpan semuanya otomatis agar kamu tidak perlu input ulang.</p>
+    </div>
+
+    <PixelButton
+      type="button"
+      onClick={handleCompleteStageSave}
+      disabled={savingCompleteStage}
+    >
+      {savingCompleteStage ? 'Menyimpan Semua...' : 'Simpan Stage Lengkap'}
+    </PixelButton>
+  </div>
 </div>
 
           </>
@@ -4632,7 +5050,7 @@ async function handleDeleteMedia(assetId) {
               <label>Nama<input value={shopForm.name} onChange={(e) => setShopForm({ ...shopForm, name: e.target.value })} /></label>
               <div className="admin-editor-grid compact-grid">
                 <label>Icon<input value={shopForm.icon} onChange={(e) => setShopForm({ ...shopForm, icon: e.target.value })} /></label>
-                <label>Warna<input value={shopForm.color} onChange={(e) => setShopForm({ ...shopForm, color: e.target.value })} placeholder="#ff9ac9" /></label>
+                <label>Warna<input type={shopForm.type === 'nameColor' ? 'color' : 'text'} value={shopForm.type === 'nameColor' ? (shopForm.color || '#ff9ac9') : shopForm.color} onChange={(e) => setShopForm({ ...shopForm, color: e.target.value })} placeholder="#ff9ac9" /></label>
                 <label>Harga<input type="number" value={shopForm.price} onChange={(e) => setShopForm({ ...shopForm, price: Number(e.target.value) })} /></label>
                 <label>Urutan<input type="number" value={shopForm.order} onChange={(e) => setShopForm({ ...shopForm, order: Number(e.target.value) })} /></label>
               </div>
@@ -4647,8 +5065,8 @@ async function handleDeleteMedia(assetId) {
             <div className="compact-list">
               {shopItems.length ? shopItems.map((item) => (
                 <div className="admin-list-row" key={item.id}>
-                  <div><strong>{item.icon} {item.name}</strong><span>{item.type} · 🪙 {item.price} · {item.published ? 'Published' : 'Draft'}</span></div>
-                  <div className="button-row"><button type="button" onClick={() => handleEditShopItem(item)}>Edit</button><button type="button" onClick={() => handleDeleteShopItem(item.id)}>Hapus</button></div>
+                  <div><strong>{item.icon} {item.name}</strong><span>{item.type} · 🪙 {item.price} · {item.archived ? 'Archived' : item.published ? 'Published' : 'Draft'}</span></div>
+                  <div className="button-row"><button type="button" onClick={() => handleEditShopItem(item)}>Edit</button><button type="button" onClick={() => handleDeleteShopItem(item.id)}>Arsipkan</button></div>
                 </div>
               )) : <p>Belum ada item shop.</p>}
             </div>

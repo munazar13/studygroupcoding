@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import LoadingState from '../components/LoadingState';
 import PixelButton from '../components/PixelButton';
-import PixelCard from '../components/PixelCard';
 import MemberName from '../components/MemberName';
+import PixelCard from '../components/PixelCard';
 import StatCard from '../components/StatCard';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { loadLearningData } from '../services/dataApi';
 import { calculateAverageQuiz, getRank, getXpPercent } from '../utils/levelSystem';
+import { mergeOwnedCosmetics, findCosmeticById } from '../utils/cosmetics';
 import { getRarityClassName, getRarityLabel } from '../utils/rarity';
 
 function getChallengeStatusText(status) {
@@ -42,42 +43,13 @@ function getRewardType(reward) {
   return String(reward?.type || reward?.category || '').toLowerCase();
 }
 
-function createFallbackReward(id, type = 'badge') {
-  const cleanId = String(id || '').trim();
-
-  if (!cleanId) return null;
-
-  const cleanName = cleanId.replace(/[-_]+/g, ' ');
-
-  return {
-    id: cleanId,
-    name: cleanName,
-    title: cleanName,
-    type,
-    category: type,
-    rarity: 'common',
-    description: type === 'title'
-      ? 'Title yang sudah kamu miliki.'
-      : 'Badge yang sudah kamu miliki.'
-  };
-}
-
-function findRewardById(rewards = [], id, type = 'badge') {
-  const cleanId = String(id || '').trim();
-
-  if (!cleanId) return null;
-
-  return (
-    rewards.find((item) => String(item?.id || '').trim() === cleanId) ||
-    createFallbackReward(cleanId, type)
-  );
-}
 
 export default function Profile() {
   const { currentMember, updateCurrentMember } = useAuth();
   const { showToast } = useToast();
 
   const [rewards, setRewards] = useState([]);
+  const [shopItems, setShopItems] = useState([]);
   const [ranks, setRanks] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -86,6 +58,7 @@ export default function Profile() {
       .then((data) => {
         setRanks(data.ranks || []);
         setRewards(data.rewards || []);
+        setShopItems(data.shopItems || []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -93,7 +66,8 @@ export default function Profile() {
   const ownedBadgeIds = useMemo(() => {
   return Array.from(new Set([
     ...(currentMember?.badges || []),
-    ...(currentMember?.ownedBadges || [])
+    ...(currentMember?.ownedBadges || []),
+    ...((currentMember?.shopInventory || []).filter((item) => item?.type === 'badge').map((item) => item.id))
   ]
     .map((item) => String(item || '').trim())
     .filter(Boolean)
@@ -103,7 +77,8 @@ export default function Profile() {
 const ownedTitleIds = useMemo(() => {
   return Array.from(new Set([
     ...(currentMember?.titles || []),
-    ...(currentMember?.ownedTitles || [])
+    ...(currentMember?.ownedTitles || []),
+    ...((currentMember?.shopInventory || []).filter((item) => item?.type === 'title').map((item) => item.id))
   ]
     .map((item) => String(item || '').trim())
     .filter(Boolean)
@@ -111,19 +86,15 @@ const ownedTitleIds = useMemo(() => {
 }, [currentMember]);
 
 const badgeRewards = useMemo(() => {
-  return ownedBadgeIds
-    .map((badgeId) => findRewardById(rewards, badgeId, 'badge'))
-    .filter(Boolean);
-}, [ownedBadgeIds, rewards]);
+  return mergeOwnedCosmetics({ rewards, shopItems, member: currentMember, ownedIds: ownedBadgeIds, type: 'badge' });
+}, [currentMember, ownedBadgeIds, rewards, shopItems]);
 
 const titleRewards = useMemo(() => {
-  return ownedTitleIds
-    .map((titleId) => findRewardById(rewards, titleId, 'title'))
-    .filter(Boolean);
-}, [ownedTitleIds, rewards]);
+  return mergeOwnedCosmetics({ rewards, shopItems, member: currentMember, ownedIds: ownedTitleIds, type: 'title' });
+}, [currentMember, ownedTitleIds, rewards, shopItems]);
 
-const activeBadge = findRewardById(rewards, currentMember?.activeBadge, 'badge');
-const activeTitle = findRewardById(rewards, currentMember?.activeTitle, 'title');
+const activeBadge = findCosmeticById({ rewards, shopItems, member: currentMember, id: currentMember?.activeBadge, type: 'badge' });
+const activeTitle = findCosmeticById({ rewards, shopItems, member: currentMember, id: currentMember?.activeTitle, type: 'title' });
 
   if (loading) {
     return <LoadingState />;
@@ -181,7 +152,7 @@ const latestChallengeReview = challengeSubmissions.find(
 
         <div>
           <p className="eyebrow">Profil Anggota</p>
-          <h1><MemberName member={currentMember} /></h1>
+          <h1><MemberName member={currentMember} shopItems={shopItems} /></h1>
 
           <p>
             {activeTitle ? getRewardName(activeTitle) : rank.name} · {currentMember.cohort}
@@ -231,6 +202,22 @@ const latestChallengeReview = challengeSubmissions.find(
           <p>Title aktif: {activeTitle ? getRewardName(activeTitle) : 'Belum dipilih'}</p>
           <p>Badge aktif: {activeBadge ? getRewardName(activeBadge) : 'Belum dipilih'}</p>
           <p>Title dan badge aktif akan tampil di leaderboard.</p>
+        </PixelCard>
+      </section>
+
+      <section className="section-block two-column">
+        <PixelCard>
+          <h2>Final Project</h2>
+          <p>Status: <strong>{currentMember.finalProjectStatus || 'belum dikirim'}</strong></p>
+          <p>Kirim submission tugas akhir dari halaman Final Project setelah semua stage selesai.</p>
+          <a className="pixel-button primary" href="#/final-quest">Buka Final Project</a>
+        </PixelCard>
+
+        <PixelCard>
+          <h2>Sertifikat</h2>
+          <p>Status: <strong>{currentMember.certificateStatus || 'belum diterbitkan'}</strong></p>
+          <p>Sertifikat diterbitkan admin setelah Final Project disetujui.</p>
+          <a className="pixel-button secondary" href="#/certificate">Cek Sertifikat</a>
         </PixelCard>
       </section>
 
@@ -318,7 +305,7 @@ const latestChallengeReview = challengeSubmissions.find(
                 className={`reward-card open ${getRarityClassName(badge.rarity)} ${isActive ? 'active-reward' : ''}`}
                 key={badge.id}
               >
-                <span className="reward-icon">🏅</span>
+                <span className="reward-icon">{badge.icon || '🏅'}</span>
                 <h3>{getRewardName(badge)}</h3>
                 <p>{badge.description || 'Badge yang sudah kamu miliki.'}</p>
                 <small>{getRarityLabel(badge.rarity)} · {isActive ? 'Sedang dipakai' : 'Belum dipakai'}</small>
@@ -357,7 +344,7 @@ const latestChallengeReview = challengeSubmissions.find(
                 className={`reward-card open ${getRarityClassName(title.rarity)} ${isActive ? 'active-reward' : ''}`}
                 key={title.id}
               >
-                <span className="reward-icon">🎖️</span>
+                <span className="reward-icon">{title.icon || '🎖️'}</span>
                 <h3>{getRewardName(title)}</h3>
                 <p>{title.description || 'Title yang sudah kamu miliki.'}</p>
                 <small>{getRarityLabel(title.rarity)} · {isActive ? 'Sedang dipakai' : 'Belum dipakai'}</small>

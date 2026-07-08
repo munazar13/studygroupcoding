@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import LoadingState from '../components/LoadingState';
+import MemberName from '../components/MemberName';
 import PixelCard from '../components/PixelCard';
 import PixelButton from '../components/PixelButton';
 import StatCard from '../components/StatCard';
@@ -29,6 +30,7 @@ export default function Dashboard() {
     ...(currentMember.completedStages || [])
   ].map((item) => Number(item))).size;
   const totalStages = data?.courses?.length || 0;
+  const completedStageLabel = totalStages ? `${completedCount}/${totalStages}` : 'Belum tersedia';
 
   if (loading || !data) {
     return <LoadingState />;
@@ -51,7 +53,7 @@ export default function Dashboard() {
       <section className="dashboard-hero">
         <div>
           <p className="eyebrow">Dashboard Anggota</p>
-          <h1>{currentMember.avatar} {currentMember.name}</h1>
+          <h1>{currentMember.avatar} <MemberName member={currentMember} shopItems={data.shopItems || []} /></h1>
           <p>{rank.name} · Stage {currentMember.currentStage || 1}/{totalStages || '-'}</p>
           <div className="pixel-progress large">
             <span style={{ width: `${Math.min((currentMember.xp / rank.nextXp) * 100, 100)}%` }} />
@@ -67,7 +69,11 @@ export default function Dashboard() {
               <Link className="pixel-button primary" to={`/course/${nextCourse.id}`}>Lanjutkan</Link>
             </>
           ) : data.courses.length ? (
-            <p>Semua stage utama selesai. Final Quest menunggu.</p>
+            <>
+              <p>Semua stage utama selesai. Final Project sudah terbuka.</p>
+              <p className="dashboard-guidance">Kirim tugas akhir supaya admin bisa review dan menerbitkan sertifikat.</p>
+              <Link className="pixel-button primary" to="/final-quest">Kirim Final Project</Link>
+            </>
           ) : (
             <p>Roadmap belum tersedia. Admin perlu membuat stage belajar terlebih dahulu.</p>
           )}
@@ -78,7 +84,7 @@ export default function Dashboard() {
         <StatCard icon="⭐" value={currentMember.xp || 0} label="XP" />
         <StatCard icon="🪙" value={currentMember.coins || 0} label="Koin" />
         <StatCard icon="🔥" value={`${currentMember.streak || 0} hari`} label="Streak" />
-        <StatCard icon="✅" value={`${completedCount}/${totalStages}`} label="Stage Selesai" />
+        <StatCard icon="✅" value={completedStageLabel} label="Stage Selesai" />
       </section>
 
       <section className="two-column">
@@ -89,6 +95,7 @@ export default function Dashboard() {
             <li>Tandai materi selesai agar Quiz Battle terbuka.</li>
             <li>Lulus quiz untuk membuka stage berikutnya.</li>
             <li>Buka chest di Reward Collection.</li>
+            <li>Setelah semua stage selesai, buka Final Project dan kirim submission.</li>
           </ol>
         </PixelCard>
         <PixelCard>

@@ -3804,3 +3804,128 @@ CARA BERMAIN DETAIL PAGE
 .how-to-number {
   flex-shrink: 0;
 }
+
+
+/* PATCH AUDIT SHOP ECONOMY V2 */
+.member-name {
+  color: inherit;
+  font: inherit;
+}
+
+.member-name--colored {
+  font-weight: inherit;
+  text-shadow: 0 0 14px color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.shop-item-card.owned {
+  position: relative;
+}
+
+.shop-item-card.owned::after {
+  content: "DIMILIKI";
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.68rem;
+  font-weight: 800;
+  opacity: 0.85;
+}
+
+.final-project-entry-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 1rem 0 1.5rem;
+}
+
+.final-project-entry-card.locked {
+  opacity: 0.9;
+}
+
+.final-project-entry-card .pixel-button {
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .final-project-entry-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .final-project-entry-card .pixel-button {
+    width: 100%;
+  }
+}
+
+.warning-help {
+  border: 1px dashed rgba(255, 193, 7, 0.45);
+  border-radius: 14px;
+  background: rgba(255, 193, 7, 0.08);
+  padding: 0.85rem 1rem;
+}
+
+.complete-stage-save-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 2px solid rgba(123, 97, 255, 0.32);
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(123, 97, 255, 0.12), rgba(0, 214, 201, 0.08));
+  box-shadow: 0 14px 34px rgba(20, 16, 55, 0.12);
+}
+
+.complete-stage-save-panel h3 {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.complete-stage-save-panel p {
+  margin-bottom: 0;
+}
+
+.complete-stage-save-panel .pixel-button {
+  flex-shrink: 0;
+  min-width: 220px;
+}
+
+@media (max-width: 720px) {
+  .complete-stage-save-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .complete-stage-save-panel .pixel-button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.admin-save-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 193, 7, 0.45);
+  border-radius: 16px;
+  background: rgba(255, 193, 7, 0.1);
+}
+
+.admin-save-alert p {
+  margin: 0.25rem 0 0;
+}
+
+.admin-save-alert button {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.55rem 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+}

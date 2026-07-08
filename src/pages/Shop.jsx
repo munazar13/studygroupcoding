@@ -22,8 +22,14 @@ function isEquipped(member, item) {
   if (item.type === 'frame') return String(member.activeFrame || '') === String(item.id || '');
   if (item.type === 'title') return String(member.activeTitle || '') === String(item.id || '');
   if (item.type === 'badge') return String(member.activeBadge || '') === String(item.id || '');
-  if (item.type === 'nameColor') return String(member.activeNameColor || '') === String(item.color || item.id || '');
-  if (item.type === 'profileDecoration') return String(member.activeProfileDecoration || '') === String(item.id || '');
+  if (item.type === 'nameColor') {
+    return String(member.activeNameColorItemId || '') === String(item.id || '')
+      || String(member.activeNameColor || '') === String(item.color || '');
+  }
+  if (item.type === 'profileDecoration') {
+    return String(member.activeProfileDecorationItemId || '') === String(item.id || '')
+      || String(member.activeProfileDecoration || '') === String(item.id || '');
+  }
   return false;
 }
 
@@ -48,11 +54,12 @@ export default function Shop() {
   }, [items, filter]);
 
   async function handleBuy(item) {
+    if (busyId) return;
     setBusyId(item.id);
     try {
       await purchaseShopItem(currentMember, item);
       await refreshMember();
-      showToast(`Berhasil membeli ${item.name}.`);
+      showToast(`Berhasil membeli ${item.name}. Item siap dipakai dari inventory.`);
     } catch (error) {
       showToast(error.message || 'Gagal membeli item.', 'error');
     } finally {
@@ -61,6 +68,7 @@ export default function Shop() {
   }
 
   async function handleEquip(item) {
+    if (busyId) return;
     setBusyId(item.id);
     try {
       await equipShopItem(currentMember, item);
@@ -101,6 +109,7 @@ export default function Shop() {
             const owned = memberOwnsShopItem(currentMember, item);
             const equipped = isEquipped(currentMember, item);
             const affordable = Number(currentMember?.coins || 0) >= Number(item.price || 0);
+            const shopLocked = Boolean(busyId);
 
             return (
               <PixelCard className={`shop-item-card ${getRarityClassName(item.rarity)} ${owned ? 'owned' : ''}`} key={item.id}>
@@ -111,12 +120,12 @@ export default function Shop() {
                 <small>{getRarityLabel(item.rarity)} · 🪙 {item.price || 0}</small>
 
                 {owned ? (
-                  <PixelButton type="button" variant={equipped ? 'secondary' : 'primary'} disabled={equipped || busyId === item.id} onClick={() => handleEquip(item)}>
-                    {equipped ? 'Sedang Dipakai' : 'Pakai Item'}
+                  <PixelButton type="button" variant={equipped ? 'secondary' : 'primary'} disabled={equipped || shopLocked} onClick={() => handleEquip(item)}>
+                    {busyId === item.id ? 'Memasang...' : equipped ? 'Sedang Dipakai' : 'Pakai Item'}
                   </PixelButton>
                 ) : (
-                  <PixelButton type="button" disabled={!affordable || busyId === item.id} onClick={() => handleBuy(item)}>
-                    {affordable ? 'Beli Item' : 'Koin Kurang'}
+                  <PixelButton type="button" disabled={!affordable || shopLocked} onClick={() => handleBuy(item)}>
+                    {busyId === item.id ? 'Membeli...' : affordable ? 'Beli Item' : 'Koin Kurang'}
                   </PixelButton>
                 )}
               </PixelCard>

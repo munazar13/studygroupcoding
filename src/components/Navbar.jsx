@@ -27,6 +27,8 @@ const memberPrimaryLinks = [
 
 const memberMoreLinks = [
   { to: '/challenges', label: 'Tantangan', icon: '⚔️' },
+  { to: '/final-quest', label: 'Final Project', icon: '🏰' },
+  { to: '/certificate', label: 'Sertifikat', icon: '📜' },
   { to: '/leaderboard', label: 'Rank', icon: '🏆' },
   { to: '/notifications', label: 'Notifikasi', icon: '🔔' },
   { to: '/cara-bermain', label: 'Cara Bermain', icon: '🎮' },

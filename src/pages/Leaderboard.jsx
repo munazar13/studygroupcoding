@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import MemberName from '../components/MemberName';
 import LoadingState from '../components/LoadingState';
+import MemberName from '../components/MemberName';
 import PixelCard from '../components/PixelCard';
 import { loadLearningData } from '../services/dataApi';
+import { findCosmeticById } from '../utils/cosmetics';
 import { getXpPercent } from '../utils/levelSystem';
 import { getRarityClassName, getRarityLabel } from '../utils/rarity';
 
@@ -21,14 +22,16 @@ function getCompletedStageCount(member) {
 function getOwnedBadgeIds(member) {
   return Array.from(new Set([
     ...(member.badges || []),
-    ...(member.ownedBadges || [])
+    ...(member.ownedBadges || []),
+    ...((member.shopInventory || []).filter((item) => item?.type === 'badge').map((item) => item.id))
   ]));
 }
 
 function getOwnedTitleIds(member) {
   return Array.from(new Set([
     ...(member.titles || []),
-    ...(member.ownedTitles || [])
+    ...(member.ownedTitles || []),
+    ...((member.shopInventory || []).filter((item) => item?.type === 'title').map((item) => item.id))
   ]));
 }
 
@@ -86,6 +89,7 @@ function formatLetting(member = {}) {
 export default function Leaderboard() {
   const [members, setMembers] = useState([]);
   const [rewards, setRewards] = useState([]);
+  const [shopItems, setShopItems] = useState([]);
   const [activeTab, setActiveTab] = useState('main');
   const [loading, setLoading] = useState(true);
 
@@ -94,6 +98,7 @@ export default function Leaderboard() {
       .then((data) => {
         setMembers((data.members || []).filter((member) => member.status === 'approved'));
         setRewards(data.rewards || []);
+        setShopItems(data.shopItems || []);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -192,8 +197,8 @@ export default function Leaderboard() {
       <section className="leaderboard-list">
         {rankedMembers.length ? rankedMembers.map((member, index) => {
           const xpPercent = getXpPercent(member);
-          const activeBadge = getRewardById(rewards, member.activeBadge, 'badge');
-          const activeTitle = getRewardById(rewards, member.activeTitle, 'title');
+          const activeBadge = findCosmeticById({ rewards, shopItems, member, id: member.activeBadge, type: 'badge' });
+          const activeTitle = findCosmeticById({ rewards, shopItems, member, id: member.activeTitle, type: 'title' });
 
           return (
             <PixelCard className={`leader-row-v2 rank-${index + 1}`} key={member.uid}>
@@ -207,7 +212,7 @@ export default function Leaderboard() {
 
               <div className="leader-info">
                 <div className="leader-name-row">
-                  <h3><MemberName member={member} /></h3>
+                  <h3><MemberName member={member} shopItems={shopItems} /></h3>
                   <p className="leader-letting">
                   {formatLetting(member)}
                   </p>
