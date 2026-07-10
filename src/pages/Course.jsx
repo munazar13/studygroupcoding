@@ -218,6 +218,18 @@ export default function Course() {
     return String(module?.id || module?.type || module?.order || '');
   }
 
+  function getModuleProgressKeys(module) {
+    return Array.from(new Set([
+      getModuleProgressKey(module),
+      String(module?.sourceSectionId || ''),
+      ...(Array.isArray(module?.duplicateSectionIds) ? module.duplicateSectionIds.map(String) : [])
+    ].filter(Boolean)));
+  }
+
+  function isModuleDone(module, doneSet = materialProgress.doneSet) {
+    return getModuleProgressKeys(module).some((key) => doneSet.has(key));
+  }
+
   const materialProgress = useMemo(() => {
     const courseProgressId = String(course?.id || stageId || '');
     const stageProgress = currentMember?.stageProgress?.[courseProgressId] || {};
@@ -225,7 +237,9 @@ export default function Course() {
       ? stageProgress.materialSectionsDone.map(String)
       : [];
     const doneSet = new Set(doneItems);
-    const doneCount = modules.filter((module) => doneSet.has(getModuleProgressKey(module))).length;
+    const doneCount = modules.filter((module) => (
+      getModuleProgressKeys(module).some((key) => doneSet.has(key))
+    )).length;
 
     return {
       doneItems,
@@ -427,16 +441,21 @@ export default function Course() {
     return `${String(course.id)}::${String(module.id || module.type || module.order)}`;
   }
 
+  function getBookmarkIds(module) {
+    return getModuleProgressKeys(module).map((moduleId) => `${String(course.id)}::${moduleId}`);
+  }
+
   function isModuleBookmarked(module) {
-    const bookmarkId = getBookmarkId(module);
+    const bookmarkIds = new Set(getBookmarkIds(module));
 
     return (currentMember.materialBookmarks || []).some(
-      (bookmark) => String(bookmark.id || '') === bookmarkId
+      (bookmark) => bookmarkIds.has(String(bookmark.id || ''))
     );
   }
 
   async function toggleModuleBookmark(module) {
     const bookmarkId = getBookmarkId(module);
+    const bookmarkIds = new Set(getBookmarkIds(module));
     const alreadyBookmarked = isModuleBookmarked(module);
 
     try {
@@ -446,7 +465,7 @@ export default function Course() {
           : [];
 
         const nextBookmarks = alreadyBookmarked
-          ? currentBookmarks.filter((bookmark) => String(bookmark.id || '') !== bookmarkId)
+          ? currentBookmarks.filter((bookmark) => !bookmarkIds.has(String(bookmark.id || '')))
           : [
               {
                 id: bookmarkId,
@@ -579,7 +598,7 @@ export default function Course() {
 
               <div className="lesson-stepper" aria-label="Navigasi bagian materi">
                 {modules.map((module, index) => {
-                  const done = materialProgress.doneSet.has(getModuleProgressKey(module));
+                  const done = isModuleDone(module);
 
                   return (
                     <button
@@ -663,7 +682,7 @@ export default function Course() {
                       type="button"
                       onClick={() => markModuleUnderstood(activeModule, { moveNext: activeSectionIndex < modules.length - 1 })}
                     >
-                      {materialProgress.doneSet.has(getModuleProgressKey(activeModule)) ? '✓ Sudah paham' : 'Tandai bagian ini paham'}
+                      {isModuleDone(activeModule) ? '✓ Sudah paham' : 'Tandai bagian ini paham'}
                     </PixelButton>
                     <PixelButton
                       type="button"

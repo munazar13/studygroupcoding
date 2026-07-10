@@ -167,6 +167,92 @@ function normalizeSection(section) {
   };
 }
 
+function getSectionLogicalKey(section = {}) {
+  const courseId = String(section.courseId || section.stageId || '').trim();
+  const type = String(section.type || '').trim().toLowerCase();
+  const order = asNumber(section.order, 0);
+  const title = String(section.title || '').trim().toLowerCase();
+  const identity = type || (order > 0 ? `order-${order}` : title);
+
+  return courseId && identity ? `${courseId}::${identity}` : '';
+}
+
+function getCanonicalSectionId(section = {}) {
+  const courseId = String(section.courseId || section.stageId || '').trim();
+  const type = String(section.type || '').trim().toLowerCase();
+
+  return courseId && type
+    ? `section-${courseId}-${type}`
+    : String(section.id || '').trim();
+}
+
+function isPreferredSectionCandidate(candidate, current) {
+  if (!current) return true;
+
+  const candidateReady = isSectionReady(candidate);
+  const currentReady = isSectionReady(current);
+
+  if (candidateReady !== currentReady) return candidateReady;
+
+  const candidatePublished = candidate.published !== false;
+  const currentPublished = current.published !== false;
+
+  if (candidatePublished !== currentPublished) return candidatePublished;
+
+  const candidateUpdatedAt = new Date(candidate.updatedAt || candidate.createdAt || 0).getTime();
+  const currentUpdatedAt = new Date(current.updatedAt || current.createdAt || 0).getTime();
+
+  if (candidateUpdatedAt !== currentUpdatedAt) return candidateUpdatedAt > currentUpdatedAt;
+
+  const candidateCanonical = String(candidate.id || '') === getCanonicalSectionId(candidate);
+  const currentCanonical = String(current.id || '') === getCanonicalSectionId(current);
+
+  if (candidateCanonical !== currentCanonical) return candidateCanonical;
+
+  return String(candidate.id || '').localeCompare(String(current.id || '')) < 0;
+}
+
+function dedupeCourseSections(sections = []) {
+  const sectionGroups = new Map();
+  const sectionsWithoutLogicalKey = [];
+
+  sections.forEach((section) => {
+    const logicalKey = getSectionLogicalKey(section);
+
+    if (!logicalKey) {
+      sectionsWithoutLogicalKey.push(section);
+      return;
+    }
+
+    const group = sectionGroups.get(logicalKey) || {
+      preferred: null,
+      ids: []
+    };
+
+    group.ids.push(String(section.id || '').trim());
+
+    if (isPreferredSectionCandidate(section, group.preferred)) {
+      group.preferred = section;
+    }
+
+    sectionGroups.set(logicalKey, group);
+  });
+
+  const uniqueSections = Array.from(sectionGroups.values()).map((group) => {
+    const preferred = group.preferred;
+    const canonicalId = getCanonicalSectionId(preferred);
+
+    return {
+      ...preferred,
+      id: canonicalId || String(preferred.id || '').trim(),
+      sourceSectionId: String(preferred.id || '').trim(),
+      duplicateSectionIds: makeUniqueList(group.ids)
+    };
+  });
+
+  return [...uniqueSections, ...sectionsWithoutLogicalKey];
+}
+
 function isSectionReady(section) {
   if (!section) return false;
 
@@ -753,10 +839,12 @@ export async function loadLearningCatalog() {
   );
 
   const publishedSections = sortByOrder(
-    courseSections
-      .map(normalizeSection)
-      .filter(Boolean)
-      .filter((section) => section.published !== false && isSectionReady(section))
+    dedupeCourseSections(
+      courseSections
+        .map(normalizeSection)
+        .filter(Boolean)
+        .filter((section) => section.published !== false && isSectionReady(section))
+    )
   );
 
   return {
@@ -812,10 +900,12 @@ export async function loadCourse(stageId) {
   const allSections = await getCollection('courseSections');
 
   const modules = sortByOrder(
-    allSections
-      .map(normalizeSection)
-      .filter(Boolean)
-      .filter((section) => section.courseId === String(stageId) && section.published !== false && isSectionReady(section))
+    dedupeCourseSections(
+      allSections
+        .map(normalizeSection)
+        .filter(Boolean)
+        .filter((section) => section.courseId === String(stageId) && section.published !== false && isSectionReady(section))
+    )
   );
 
   return {
@@ -2405,7 +2495,7 @@ export async function importLearningContent(jsonText) {
     throw new Error('Template import masih berisi placeholder [ISI ...]. Lengkapi dulu semua data stage sebelum import.');
   }
 
-  const allowed = ['courses', 'courseSections', 'questions'];
+  const allowed = ['courses', 'questions'];
   let count = 0;
 
   for (const collectionName of allowed) {
@@ -2416,6 +2506,40 @@ export async function importLearningContent(jsonText) {
       const id = String(item.id || item.uid || '').trim();
       if (!id) continue;
       await setDocument(collectionName, id, { ...item, updatedAt: new Date().toISOString(), schemaVersion: APP_SCHEMA_VERSION });
+      count += 1;
+    }
+  }
+
+  const importedSections = dedupeCourseSections(
+    (Array.isArray(parsed?.courseSections) ? parsed.courseSections : [])
+      .map(normalizeSection)
+      .filter(Boolean)
+  ).map((section) => ({
+    ...section,
+    id: getCanonicalSectionId(section) || String(section.id || '').trim(),
+    updatedAt: new Date().toISOString(),
+    schemaVersion: APP_SCHEMA_VERSION
+  }));
+
+  if (importedSections.length) {
+    const importedLogicalKeys = new Set(importedSections.map(getSectionLogicalKey).filter(Boolean));
+    const canonicalIds = new Set(importedSections.map((section) => String(section.id || '')).filter(Boolean));
+    const existingSections = (await getCollection('courseSections'))
+      .map(normalizeSection)
+      .filter(Boolean);
+
+    for (const existingSection of existingSections) {
+      const logicalKey = getSectionLogicalKey(existingSection);
+      const existingId = String(existingSection.id || '').trim();
+
+      if (importedLogicalKeys.has(logicalKey) && existingId && !canonicalIds.has(existingId)) {
+        await deleteDocument('courseSections', existingId);
+      }
+    }
+
+    for (const section of importedSections) {
+      if (!section.id) continue;
+      await setDocument('courseSections', section.id, section);
       count += 1;
     }
   }

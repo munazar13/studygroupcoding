@@ -1619,6 +1619,7 @@ async function saveSectionFormsForCourse(courseId, { allowPartial = false } = {}
 
   const savedSections = [];
   const savedLogicalSections = [];
+  const removedSectionIds = [];
 
   for (const section of sectionsToSave) {
     const template = FIXED_MATERIAL_SECTIONS.find(
@@ -1630,51 +1631,52 @@ async function saveSectionFormsForCourse(courseId, { allowPartial = false } = {}
     }
 
     const canonicalId = `section-${courseId}-${template.type}`;
-    const targetIds = Array.from(new Set([
+    const existingIds = Array.from(new Set([
       String(section.id || '').trim(),
       String(section.canonicalId || '').trim(),
       canonicalId,
       ...findExistingSectionIdsForSave(contentData.courseSections, courseId, canonicalId, template)
     ].filter(Boolean)));
 
-    console.info('[Konten Belajar] Target dokumen materi', {
+    const duplicateIds = existingIds.filter((id) => id !== canonicalId);
+
+    console.info('[Konten Belajar] Canonicalisasi dokumen materi', {
       courseId: String(courseId),
       title: template.title,
       type: template.type,
-      targetIds
+      canonicalId,
+      duplicateIds
     });
 
-    let canonicalSaved = null;
+    const canonicalSaved = await upsertCourseSection({
+      ...section,
+      id: canonicalId,
+      canonicalId,
+      courseId: String(courseId),
+      order: template.order,
+      type: template.type,
+      title: template.title,
+      code: '',
+      checkpoint: section.checkpoint || template.defaultCheckpoint,
+      published: section.published === true
+    });
 
-    for (const targetId of targetIds) {
-      const savedSection = await upsertCourseSection({
-        ...section,
-        id: targetId,
-        canonicalId,
-        courseId: String(courseId),
-        order: template.order,
-        type: template.type,
-        title: template.title,
-        code: '',
-        checkpoint: section.checkpoint || template.defaultCheckpoint,
-        published: section.published === true
-      });
+    savedSections.push(canonicalSaved);
 
-      savedSections.push(savedSection);
-
-      if (targetId === canonicalId) {
-        canonicalSaved = savedSection;
-      }
+    for (const duplicateId of duplicateIds) {
+      await removeRecord('courseSections', duplicateId);
+      removedSectionIds.push(duplicateId);
     }
 
-    savedLogicalSections.push(canonicalSaved || savedSections[savedSections.length - 1]);
+    savedLogicalSections.push(canonicalSaved);
   }
 
   return {
     saved: true,
     count: savedLogicalSections.length,
     sections: savedSections,
-    logicalSections: savedLogicalSections
+    logicalSections: savedLogicalSections,
+    removedSectionIds
   };
 }
 
@@ -1780,11 +1782,15 @@ async function handleAllSectionsSubmit(event) {
     if (!result.saved) return;
 
     const savedSectionIds = new Set(result.sections.map((section) => String(section.id)));
+    const removedSectionIds = new Set((result.removedSectionIds || []).map(String));
 
     setContentData((current) => ({
       ...current,
       courseSections: [
-        ...current.courseSections.filter((section) => !savedSectionIds.has(String(section.id))),
+        ...current.courseSections.filter((section) => (
+          !savedSectionIds.has(String(section.id)) &&
+          !removedSectionIds.has(String(section.id))
+        )),
         ...result.sections
       ]
     }));
