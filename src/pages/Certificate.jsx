@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import LoadingState from '../components/LoadingState';
 import PixelCard from '../components/PixelCard';
 import { useAuth } from '../context/AuthContext';
-import { loadCertificates } from '../services/dataApi';
+import { loadCertificateByCode } from '../services/dataApi';
 
 function formatDate(value) {
   if (!value) return '-';
@@ -16,13 +16,26 @@ export default function Certificate() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadCertificates()
-      .then((items) => {
-        const owned = items.find((item) => String(item.uid || '') === String(currentMember.uid || '') && String(item.status || 'valid') === 'valid');
+    const certificateCode = String(currentMember?.certificateCode || '').trim();
+
+    if (!certificateCode) {
+      setCertificate(null);
+      setLoading(false);
+      return;
+    }
+
+    loadCertificateByCode(certificateCode)
+      .then((item) => {
+        const owned = item
+          && String(item.uid || '') === String(currentMember.uid || '')
+          && String(item.status || 'valid') === 'valid'
+          ? item
+          : null;
+
         setCertificate(owned || null);
       })
       .finally(() => setLoading(false));
-  }, [currentMember.uid]);
+  }, [currentMember?.certificateCode, currentMember?.uid]);
 
   if (loading) return <LoadingState />;
 

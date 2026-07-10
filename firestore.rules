@@ -128,8 +128,29 @@ service cloud.firestore {
         && request.resource.data.role == 'member'
         && request.resource.data.status == 'pending';
 
-      allow read: if isAdmin() || isApproved() || isOwner(uid);
+      allow read: if isAdmin() || isOwner(uid);
       allow update: if isAdmin() || safeMemberSelfUpdate(uid);
+      allow delete: if isAdmin();
+    }
+
+
+
+    match /publicProfiles/{uid} {
+      allow read: if true;
+      allow create, update: if (isAdmin() || isOwner(uid))
+        && exists(memberPath(uid))
+        && request.resource.data.uid == uid
+        && request.resource.data.status == get(memberPath(uid)).data.status
+        && request.resource.data.role == get(memberPath(uid)).data.role
+        && request.resource.data.keys().hasOnly([
+          'id', 'uid', 'name', 'cohort', 'avatar', 'role', 'status',
+          'level', 'xp', 'xpToNextLevel', 'totalXp', 'streak', 'currentStage',
+          'completedStageCount', 'completedStages', 'passedStages',
+          'badges', 'ownedBadges', 'titles', 'ownedTitles',
+          'activeBadge', 'activeTitle', 'activeNameColor', 'activeNameColorItemId',
+          'activeProfileDecoration', 'activeProfileDecorationItemId',
+          'publicUpdatedAt', 'updatedAt', 'schemaVersion'
+        ]);
       allow delete: if isAdmin();
     }
 
@@ -236,7 +257,8 @@ service cloud.firestore {
     }
 
     match /certificates/{id} {
-      allow read: if true;
+      allow get: if true;
+      allow list: if isAdmin();
       allow write: if isAdmin();
     }
 

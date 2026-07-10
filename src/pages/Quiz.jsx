@@ -3,95 +3,11 @@ import { useEffect, useMemo, useState } from 'react';
 import LoadingState from '../components/LoadingState';
 import PixelButton from '../components/PixelButton';
 import PixelCard from '../components/PixelCard';
+import LessonContent from '../components/LessonContent';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { createContentReport, loadCourse, loadQuestions } from '../services/dataApi';
-import { applyQuizAttempt, applyQuizPass } from '../utils/progress';
-
-function renderQuizContent(content, keyPrefix = 'quiz-content') {
-  const rawContent = Array.isArray(content)
-    ? content.join('\n\n')
-    : String(content || '');
-
-  if (!rawContent.trim()) {
-    return null;
-  }
-
-  const parts = rawContent.split(/```/g);
-
-  return parts.flatMap((part, index) => {
-    const isCodeBlock = index % 2 === 1;
-
-    if (isCodeBlock) {
-      const cleanPart = part.replace(/^\n/, '').trimEnd();
-const lines = cleanPart.split('\n');
-
-let language = 'text';
-let code = cleanPart;
-
-const firstLine = lines[0]?.trim() || '';
-const knownLanguages = ['php', 'html', 'css', 'js', 'javascript', 'txt', 'sql', 'json'];
-
-if (lines.length > 1 && knownLanguages.includes(firstLine.toLowerCase())) {
-  language = firstLine.toLowerCase();
-  code = lines.slice(1).join('\n').trimEnd();
-} else {
-  const oneLineMatch = cleanPart.match(/^([a-zA-Z0-9_-]+)\s+([\s\S]*)$/);
-
-  if (oneLineMatch && knownLanguages.includes(oneLineMatch[1].toLowerCase())) {
-    language = oneLineMatch[1].toLowerCase();
-    code = oneLineMatch[2].trimEnd();
-  }
-}
-
-      return [
-        <pre
-          className={`lesson-code-block quiz-code-block language-${language}`}
-          key={`${keyPrefix}-code-${index}`}
-        >
-          <code>{code}</code>
-        </pre>
-      ];
-    }
-
-    const blocks = part
-      .split(/\n{2,}/g)
-      .map((block) => block.trim())
-      .filter(Boolean);
-
-    return blocks.flatMap((block, blockIndex) => {
-      const lines = block
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean);
-
-      return lines.map((line, lineIndex) => {
-        const imageMatch = line.match(/^!\[(.*?)\]\((.*?)\)$/);
-
-        if (imageMatch) {
-          const altText = imageMatch[1] || 'Gambar soal';
-          const imageUrl = imageMatch[2] || '';
-
-          return (
-            <figure
-              className="lesson-image-block quiz-image-block"
-              key={`${keyPrefix}-image-${index}-${blockIndex}-${lineIndex}`}
-            >
-              <img src={imageUrl} alt={altText} loading="lazy" />
-              <figcaption>{altText}</figcaption>
-            </figure>
-          );
-        }
-
-        return (
-          <p key={`${keyPrefix}-paragraph-${index}-${blockIndex}-${lineIndex}`}>
-            {line}
-          </p>
-        );
-      });
-    });
-  });
-}
+import { applyQuizAttempt, applyQuizPass, getStageRewardPreview } from '../utils/progress';
 
 function hasNumberId(items = [], id) {
   const target = Number(id);
@@ -101,6 +17,51 @@ function hasNumberId(items = [], id) {
 
 function getCourseStageNumber(course = {}) {
   return Number(course.stage || course.order || course.id || 0);
+}
+
+function getRecommendedReviewModules(course = {}, question = {}, questionIndex = 0, totalQuestions = 1) {
+  const modules = Array.isArray(course.modules) ? course.modules : [];
+
+  if (!modules.length) return [];
+
+  const haystack = [
+    question.question,
+    question.explanation,
+    ...(Array.isArray(question.options) ? question.options : [])
+  ].join(' ').toLowerCase();
+
+  const matched = modules.filter((module) => {
+    const title = String(module.title || '').toLowerCase();
+    const type = String(module.type || '').toLowerCase();
+    const titleWords = title.split(/\s+/).filter((word) => word.length >= 5);
+
+    return (
+      (type && haystack.includes(type)) ||
+      titleWords.some((word) => haystack.includes(word))
+    );
+  });
+
+  if (matched.length) return matched.slice(0, 2);
+
+  const estimatedIndex = Math.min(
+    modules.length - 1,
+    Math.max(0, Math.floor((questionIndex / Math.max(1, totalQuestions)) * modules.length))
+  );
+
+  const fallbackIndexes = [estimatedIndex, 1, 3, 5].filter((index) => index >= 0 && index < modules.length);
+  const unique = [];
+  fallbackIndexes.forEach((index) => {
+    const module = modules[index];
+    if (module && !unique.some((item) => String(item.id || item.type || item.order) === String(module.id || module.type || module.order))) {
+      unique.push(module);
+    }
+  });
+
+  return unique.slice(0, 2);
+}
+
+function getModuleQueryValue(module, index = 0) {
+  return String(module?.type || module?.id || module?.order || index);
 }
 
 export default function Quiz() {
@@ -119,6 +80,8 @@ export default function Quiz() {
   const [reportMessage, setReportMessage] = useState('');
   const [reportSending, setReportSending] = useState(false);
   const [submittingQuiz, setSubmittingQuiz] = useState(false);
+  const [flaggedQuestions, setFlaggedQuestions] = useState({});
+  const [reviewingAnswers, setReviewingAnswers] = useState(false);
 
   useEffect(() => {
     Promise.all([loadCourse(stageId), loadQuestions(stageId)])
@@ -147,6 +110,18 @@ export default function Quiz() {
       passed: score >= Number(course?.minScore || 70)
     };
   }, [answers, course, questions]);
+
+  const answeredCount = Object.keys(answers).length;
+  const flaggedCount = Object.values(flaggedQuestions).filter(Boolean).length;
+
+  function toggleActiveQuestionFlag() {
+    if (!activeQuestion) return;
+
+    setFlaggedQuestions((current) => ({
+      ...current,
+      [activeQuestion.id]: !current[activeQuestion.id]
+    }));
+  }
 
   if (loading) {
     return <LoadingState />;
@@ -221,6 +196,18 @@ export default function Quiz() {
     return;
   }
 
+  if (Object.values(flaggedQuestions).some(Boolean)) {
+    const confirmed = window.confirm('Masih ada soal yang kamu tandai ragu-ragu. Tetap selesaikan quiz sekarang?');
+
+    if (!confirmed) return;
+  }
+
+  if (!reviewingAnswers) {
+    setReviewingAnswers(true);
+    showToast('Cek ulang ringkasan jawaban. Klik Selesaikan sekali lagi kalau sudah yakin.');
+    return;
+  }
+
   const stageNumber = getCourseStageNumber(course) || Number(stageId);
   const alreadyPassed = hasNumberId(currentMember.passedStages || [], stageNumber);
   const oldLevel = Number(currentMember.level || 1);
@@ -232,6 +219,10 @@ export default function Quiz() {
     chestStages.includes(stageNumber);
 
   let updatedMember = currentMember;
+  const stageRewardPreview = computedResult.passed && !alreadyPassed
+    ? getStageRewardPreview(course)
+    : [];
+
   setSubmittingQuiz(true);
 
   try {
@@ -264,7 +255,7 @@ export default function Quiz() {
       ? Number(course.coinReward || 20)
       : 0,
     chestAvailable: computedResult.passed && !alreadyPassed && hasChestReward,
-    stageRewards: computedResult.passed && !alreadyPassed ? (updatedMember?.lastStageRewards || []) : [],
+    stageRewards: stageRewardPreview,
     oldLevel,
     newLevel: Number(updatedMember?.level || oldLevel),
     xp: Number(updatedMember?.xp || 0),
@@ -368,12 +359,36 @@ export default function Quiz() {
         )}
 
         <div className="result-actions">
+          {!result.passed ? (
+            <PixelButton
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                const wrongAnswers = {};
+                questions.forEach((question) => {
+                  if (Number(answers[question.id]) !== Number(question.correctIndex)) {
+                    wrongAnswers[question.id] = answers[question.id];
+                  }
+                });
+                setResult(null);
+                setAnswers(wrongAnswers);
+                setFlaggedQuestions({});
+                setReviewingAnswers(false);
+                const firstWrongIndex = questions.findIndex((question) => Number(answers[question.id]) !== Number(question.correctIndex));
+                setActiveIndex(firstWrongIndex >= 0 ? firstWrongIndex : 0);
+              }}
+            >
+              🎯 Ulangi soal yang salah
+            </PixelButton>
+          ) : null}
           <PixelButton
             type="button"
             variant="secondary"
             onClick={() => {
               setResult(null);
               setAnswers({});
+              setFlaggedQuestions({});
+              setReviewingAnswers(false);
               setActiveIndex(0);
             }}
           >
@@ -398,15 +413,23 @@ export default function Quiz() {
         </div>
       </PixelCard>
 
+      {!result.passed ? (
+        <PixelCard className="smart-feedback-summary">
+          <p className="eyebrow">Arahan Belajar Ulang</p>
+          <h2>Jangan cuma ulang quiz, ulangi konsep yang paling dekat dengan soal salah.</h2>
+          <p>Di bawah setiap soal salah ada rekomendasi bagian materi. Buka bagian itu, baca ulang contoh praktiknya, lalu kembali mengerjakan soal yang salah.</p>
+        </PixelCard>
+      ) : null}
+
       <section className="review-list">
-        {questions.map((question) => {
+        {questions.map((question, questionIndex) => {
           const userIndex = Number(answers[question.id]);
           const correct = userIndex === Number(question.correctIndex);
 
           return (
             <PixelCard className={correct ? 'review-card correct' : 'review-card wrong'} key={question.id}>
   <div className="quiz-question-text">
-    {renderQuizContent(question.question, `review-question-${question.id}`)}
+    <LessonContent content={question.question} keyPrefix={`review-question-${question.id}`} />
   </div>
 
   <div className="review-answer-block">
@@ -414,7 +437,7 @@ export default function Quiz() {
 
     <div className="review-answer-content">
       {question.options[userIndex]
-        ? renderQuizContent(question.options[userIndex], `user-answer-${question.id}`)
+        ? <LessonContent content={question.options[userIndex]} keyPrefix={`user-answer-${question.id}`} />
         : <p>Tidak dijawab</p>}
     </div>
   </div>
@@ -423,7 +446,7 @@ export default function Quiz() {
     <strong>Jawaban benar:</strong>
 
     <div className="review-answer-content">
-      {renderQuizContent(question.options[question.correctIndex], `correct-answer-${question.id}`)}
+      <LessonContent content={question.options[question.correctIndex]} keyPrefix={`correct-answer-${question.id}`} />
     </div>
   </div>
 
@@ -432,7 +455,25 @@ export default function Quiz() {
       <strong>Pembahasan:</strong>
 
       <div>
-        {renderQuizContent(question.explanation, `explanation-${question.id}`)}
+        <LessonContent content={question.explanation} keyPrefix={`explanation-${question.id}`} />
+      </div>
+    </div>
+  ) : null}
+
+  {!correct ? (
+    <div className="smart-review-box">
+      <strong>Belajar ulang yang disarankan:</strong>
+      <p>Soal ini kemungkinan berkaitan dengan konsep di bawah. Buka materi, baca ulang, lalu coba jelaskan ulang dengan bahasa sendiri.</p>
+      <div className="smart-review-links">
+        {getRecommendedReviewModules(course, question, questionIndex, questions.length).map((module, moduleIndex) => (
+          <Link
+            className="pixel-button ghost review-material-link"
+            key={`${question.id}-review-${module.id || module.type || moduleIndex}`}
+            to={`/course/${course.id || stageId}?section=${getModuleQueryValue(module, moduleIndex)}`}
+          >
+            📖 Materi {module.order || moduleIndex + 1}: {module.title || 'Baca ulang'}
+          </Link>
+        ))}
       </div>
     </div>
   ) : null}
@@ -449,13 +490,77 @@ export default function Quiz() {
       <section className="page-hero compact-hero">
         <p className="eyebrow">Quiz Battle</p>
         <h1>Stage {course.id}: {course.title}</h1>
-        <p>Soal {activeIndex + 1} dari {questions.length}</p>
+        <p>Soal {activeIndex + 1} dari {questions.length} · Terjawab {answeredCount}/{questions.length} · Ragu-ragu {flaggedCount}</p>
         <div className="pixel-progress large"><span style={{ width: `${progress}%` }} /></div>
       </section>
 
+      <div className="quiz-question-nav" aria-label="Navigasi soal quiz">
+        {questions.map((question, index) => {
+          const answered = Object.prototype.hasOwnProperty.call(answers, question.id);
+          const flagged = Boolean(flaggedQuestions[question.id]);
+
+          return (
+            <button
+              className={[
+                'quiz-question-chip',
+                index === activeIndex ? 'active' : '',
+                answered ? 'answered' : '',
+                flagged ? 'flagged' : ''
+              ].filter(Boolean).join(' ')}
+              key={question.id}
+              type="button"
+              onClick={() => setActiveIndex(index)}
+              title={flagged ? `Soal ${index + 1} ditandai ragu-ragu` : `Buka soal ${index + 1}`}
+            >
+              {index + 1}{flagged ? ' !' : ''}
+            </button>
+          );
+        })}
+      </div>
+
+
+      {reviewingAnswers ? (
+        <PixelCard className="quiz-review-panel">
+          <p className="eyebrow">Review Sebelum Submit</p>
+          <h2>Cek jawabanmu sekali lagi</h2>
+          <p>
+            Semua soal sudah dijawab. Lihat nomor yang masih ragu-ragu, buka kembali jika perlu,
+            lalu klik Selesaikan sekali lagi kalau sudah yakin.
+          </p>
+          <div className="quiz-review-grid">
+            {questions.map((question, index) => {
+              const answered = Object.prototype.hasOwnProperty.call(answers, question.id);
+              const flagged = Boolean(flaggedQuestions[question.id]);
+
+              return (
+                <button
+                  className={['quiz-review-item', answered ? 'answered' : '', flagged ? 'flagged' : ''].filter(Boolean).join(' ')}
+                  key={`review-${question.id}`}
+                  type="button"
+                  onClick={() => {
+                    setActiveIndex(index);
+                    setReviewingAnswers(false);
+                  }}
+                >
+                  <strong>Soal {index + 1}</strong>
+                  <span>{flagged ? 'Ragu-ragu' : 'Siap'}</span>
+                </button>
+              );
+            })}
+          </div>
+        </PixelCard>
+      ) : null}
+
       <PixelCard className="question-card">
+  <div className="quiz-question-head">
+    <p className="eyebrow">Soal {activeIndex + 1}</p>
+    <PixelButton type="button" variant={flaggedQuestions[activeQuestion.id] ? 'secondary' : 'ghost'} onClick={toggleActiveQuestionFlag}>
+      {flaggedQuestions[activeQuestion.id] ? '⚑ Ragu-ragu' : '⚐ Tandai ragu'}
+    </PixelButton>
+  </div>
+
   <div className="quiz-question-text">
-    {renderQuizContent(activeQuestion.question, `question-${activeQuestion.id}`)}
+    <LessonContent content={activeQuestion.question} keyPrefix={`question-${activeQuestion.id}`} />
   </div>
 
   <div className="answer-grid">
@@ -464,10 +569,13 @@ export default function Quiz() {
       className={Number(answers[activeQuestion.id]) === index ? 'answer-option selected' : 'answer-option'}
       key={`${activeQuestion.id}-${index}`}
       type="button"
-      onClick={() => setAnswers({ ...answers, [activeQuestion.id]: index })}
+      onClick={() => {
+        setAnswers({ ...answers, [activeQuestion.id]: index });
+        setReviewingAnswers(false);
+      }}
     >
       <div className="answer-option-content">
-        {renderQuizContent(option, `option-${activeQuestion.id}-${index}`)}
+        <LessonContent content={option} keyPrefix={`option-${activeQuestion.id}-${index}`} />
       </div>
     </button>
   ))}
@@ -486,7 +594,7 @@ export default function Quiz() {
           <PixelButton onClick={() => setActiveIndex((index) => index + 1)}>Lanjut</PixelButton>
         ) : (
           <PixelButton onClick={finishQuiz} disabled={submittingQuiz}>
-            {submittingQuiz ? 'Menyimpan...' : 'Selesaikan'}
+            {submittingQuiz ? 'Menyimpan...' : reviewingAnswers ? 'Selesaikan Sekarang' : 'Review Jawaban'}
           </PixelButton>
         )}
       </div>

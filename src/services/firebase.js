@@ -83,6 +83,71 @@ function isConfiguredAdminEmail(email) {
   return normalizeEmail(email) === normalizeEmail(firebaseAppOptions.adminEmail);
 }
 
+
+function uniqueStringList(items = []) {
+  return Array.from(
+    new Set(
+      (items || [])
+        .map((item) => String(item || '').trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function countCompletedStages(member = {}) {
+  return uniqueStringList([
+    ...(member.completedStages || []),
+    ...(member.passedStages || [])
+  ]).length;
+}
+
+function createPublicMemberProfile(member = {}) {
+  const uid = String(member.uid || member.id || '').trim();
+  const now = new Date().toISOString();
+
+  return {
+    id: uid,
+    uid,
+    name: String(member.name || member.displayName || 'Anggota').trim() || 'Anggota',
+    cohort: String(member.cohort || member.letting || member.angkatan || '').trim(),
+    avatar: String(member.avatar || '🧑‍💻').trim() || '🧑‍💻',
+    role: String(member.role || 'member'),
+    status: String(member.status || 'pending'),
+    level: Number(member.level || 1),
+    xp: Number(member.xp || 0),
+    xpToNextLevel: Number(member.xpToNextLevel || 100),
+    totalXp: Number(member.totalXp || member.xp || 0),
+    streak: Number(member.streak || 0),
+    currentStage: Number(member.currentStage || 1),
+    completedStageCount: countCompletedStages(member),
+    completedStages: uniqueStringList(member.completedStages || member.passedStages || []),
+    passedStages: uniqueStringList(member.passedStages || []),
+    badges: uniqueStringList(member.badges || []),
+    ownedBadges: uniqueStringList(member.ownedBadges || member.badges || []),
+    titles: uniqueStringList(member.titles || []),
+    ownedTitles: uniqueStringList(member.ownedTitles || member.titles || []),
+    activeBadge: String(member.activeBadge || ''),
+    activeTitle: String(member.activeTitle || ''),
+    activeNameColor: String(member.activeNameColor || ''),
+    activeNameColorItemId: String(member.activeNameColorItemId || member.activeNameColorId || ''),
+    activeProfileDecoration: String(member.activeProfileDecoration || ''),
+    activeProfileDecorationItemId: String(member.activeProfileDecorationItemId || ''),
+    publicUpdatedAt: now,
+    updatedAt: now,
+    schemaVersion: 3
+  };
+}
+
+export async function syncMemberPublicProfile(member) {
+  if (!firebaseReady() || !member?.uid) {
+    return null;
+  }
+
+  const profile = createPublicMemberProfile(member);
+  await setDoc(doc(db, 'publicProfiles', profile.uid), profile, { merge: true });
+  return profile;
+}
+
 function createVirtualAdminMember(user) {
   const now = new Date().toISOString();
 
@@ -362,6 +427,7 @@ export async function createMemberAccount(payload) {
     );
 
     await setDoc(doc(db, 'members', credential.user.uid), member);
+    await syncMemberPublicProfile(member);
 
     await setDoc(nimIndexRef, {
       nim: cleanNim,
@@ -423,10 +489,24 @@ export async function getMember(uid) {
 }
 
 export async function updateMember(uid, patch) {
-  await updateDoc(doc(db, 'members', uid), {
+  const memberRef = doc(db, 'members', uid);
+
+  await updateDoc(memberRef, {
     ...patch,
     updatedAt: new Date().toISOString()
   });
+
+  try {
+    const snapshot = await getDoc(memberRef);
+
+    if (snapshot.exists()) {
+      await syncMemberPublicProfile({ id: snapshot.id, ...snapshot.data() });
+    }
+  } catch (error) {
+    // Public profile hanya dipakai untuk leaderboard/privasi.
+    // Jangan gagalkan update utama member kalau sinkronisasi profil publik gagal.
+    console.warn('Gagal menyinkronkan public profile member:', error);
+  }
 }
 
 export async function getCollection(collectionName, options = {}) {

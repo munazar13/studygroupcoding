@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 3,
+  "templateName": "Study Group Coding Academy - Template Import 1 Stage",
+  "instructions": [
+    "Isi placeholder [ISI ...] sebelum import.",
+    "Pastikan id course sama dengan courseId di semua courseSections dan questions.",
+    "Section wajib 6 bagian: opening, concept, step_by_step, practice, common_mistakes, understanding_check.",
+    "Question correctIndex memakai angka 0 untuk A, 1 untuk B, 2 untuk C, 3 untuk D.",
+    "Hapus baris instructions boleh, tetapi jangan ubah nama collection courses, courseSections, questions.",
+    "Checkpoint sekarang wajib berupa pertanyaan yang menguji konsep, bukan kalimat pemberitahuan.",
+    "Field taskTitle dan taskDescription akan tampil sebagai Tugas Stage di akhir materi.",
+    "Field playgroundHtml, playgroundCss, dan playgroundJs akan menjadi kode awal playground output langsung untuk stage HTML/CSS/JavaScript.",
+    "Untuk code block materi/soal, gunakan label bahasa seperti ```PHP, ```HTML, ```CSS, ```JavaScript, atau ```SQL."
+  ],
+  "courses": [
+    {
+      "id": "[ISI_NOMOR_STAGE]",
+      "stage": 0,
+      "order": 0,
+      "title": "[ISI JUDUL STAGE]",
+      "area": "[ISI KATEGORI/AREA]",
+      "theme": "[ISI DESKRIPSI STAGE]",
+      "taskTitle": "[ISI JUDUL TUGAS STAGE]",
+      "taskDescription": "[ISI INSTRUKSI TUGAS STAGE. Contoh: Buat halaman/form/card kecil sesuai materi, lalu coba di playground.]",
+      "playgroundHtml": "[ISI KODE AWAL HTML UNTUK PLAYGROUND, KOSONGKAN JIKA TIDAK PERLU]",
+      "playgroundCss": "[ISI KODE AWAL CSS UNTUK PLAYGROUND, KOSONGKAN JIKA TIDAK PERLU]",
+      "playgroundJs": "[ISI KODE AWAL JAVASCRIPT UNTUK PLAYGROUND, KOSONGKAN JIKA TIDAK PERLU]",
+      "minScore": 70,
+      "xpReward": 0,
+      "coinReward": 0,
+      "published": true,
+      "badgeRewardEnabled": true,
+      "badgeId": "badge_stage_[ISI_NOMOR_STAGE]",
+      "badgeName": "[ISI NAMA BADGE]",
+      "badgeDescription": "[ISI DESKRIPSI BADGE]",
+      "badgeIcon": "🏅",
+      "badgeRarity": "rare",
+      "titleRewardEnabled": false,
+      "titleRewardId": "",
+      "titleRewardName": "",
+      "titleRewardDescription": "",
+      "titleRewardIcon": "🎖️",
+      "titleRewardRarity": "rare",
+      "hasChestReward": false,
+      "chestId": "",
+      "chestName": "",
+      "chestDescription": "",
+      "chestIcon": "🎁",
+      "chestRarity": "rare"
+    }
+  ],
+  "courseSections": [
+    {
+      "id": "section-[ISI_NOMOR_STAGE]-opening",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 1,
+      "type": "opening",
+      "title": "Pembukaan Materi",
+      "content": "[ISI MATERI PEMBUKAAN. Gunakan paragraf biasa, markdown heading, list, atau code block jika perlu.]",
+      "checkpoint": "[ISI PERTANYAAN KONSEP PEMBUKAAN. Contoh: Apa inti awal materi ini dan mengapa penting untuk stage berikutnya?]",
+      "published": true
+    },
+    {
+      "id": "section-[ISI_NOMOR_STAGE]-concept",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 2,
+      "type": "concept",
+      "title": "Penjelasan Konsep",
+      "content": "[ISI PENJELASAN KONSEP]",
+      "checkpoint": "[ISI PERTANYAAN KONSEP. Contoh: Jelaskan fungsi konsep utama materi ini dengan bahasamu sendiri.]",
+      "published": true
+    },
+    {
+      "id": "section-[ISI_NOMOR_STAGE]-step_by_step",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 3,
+      "type": "step_by_step",
+      "title": "Cara Berpikir Langkah demi Langkah",
+      "content": "[ISI ALUR BERPIKIR BERTAHAP]",
+      "checkpoint": "[ISI PERTANYAAN ALUR BERPIKIR. Contoh: Urutkan langkah penyelesaian masalah dari awal sampai hasil.]",
+      "published": true
+    },
+    {
+      "id": "section-[ISI_NOMOR_STAGE]-practice",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 4,
+      "type": "practice",
+      "title": "Contoh Praktik",
+      "content": "[ISI CONTOH PRAKTIK. Untuk kode, pakai format: ```PHP\\n<?php echo \"Halo\"; ?>\\n``` atau ```HTML\\n<h1>Halo</h1>\\n``` atau ```CSS\\n.card { padding: 16px; }\\n``` atau ```JavaScript\\nconsole.log(\"Halo\");\\n```]",
+      "checkpoint": "[ISI PERTANYAAN PRAKTIK. Contoh: Dari contoh kode/praktik, bagian mana yang menjadi input, proses, dan output?]",
+      "published": true
+    },
+    {
+      "id": "section-[ISI_NOMOR_STAGE]-common_mistakes",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 5,
+      "type": "common_mistakes",
+      "title": "Kesalahan Umum",
+      "content": "[ISI MINIMAL 7 KESALAHAN UMUM DAN PENJELASANNYA]",
+      "checkpoint": "[ISI PERTANYAAN KESALAHAN UMUM. Contoh: Kesalahan apa yang paling mungkin terjadi dan bagaimana memperbaikinya?]",
+      "published": true
+    },
+    {
+      "id": "section-[ISI_NOMOR_STAGE]-understanding_check",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 6,
+      "type": "understanding_check",
+      "title": "Cek Pemahaman Sebelum Lanjut",
+      "content": "[ISI RANGKUMAN DAN CEK PEMAHAMAN SEBELUM STAGE BERIKUTNYA]",
+      "checkpoint": "[ISI PERTANYAAN CEK AKHIR. Contoh: Jika diberi kasus baru, bagaimana kamu menerapkan konsep stage ini?]",
+      "published": true
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-[ISI_NOMOR_STAGE]-1",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 1,
+      "type": "multiple-choice",
+      "question": "[ISI PERTANYAAN 1]",
+      "options": [
+        "[PILIHAN A]",
+        "[PILIHAN B]",
+        "[PILIHAN C]",
+        "[PILIHAN D]"
+      ],
+      "correctIndex": 0,
+      "explanation": "[ISI PEMBAHASAN JAWABAN 1]",
+      "published": true
+    },
+    {
+      "id": "q-[ISI_NOMOR_STAGE]-2",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 2,
+      "type": "multiple-choice",
+      "question": "[ISI PERTANYAAN 2]",
+      "options": [
+        "[PILIHAN A]",
+        "[PILIHAN B]",
+        "[PILIHAN C]",
+        "[PILIHAN D]"
+      ],
+      "correctIndex": 1,
+      "explanation": "[ISI PEMBAHASAN JAWABAN 2]",
+      "published": true
+    },
+    {
+      "id": "q-[ISI_NOMOR_STAGE]-3",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 3,
+      "type": "multiple-choice",
+      "question": "[ISI PERTANYAAN 3]",
+      "options": [
+        "[PILIHAN A]",
+        "[PILIHAN B]",
+        "[PILIHAN C]",
+        "[PILIHAN D]"
+      ],
+      "correctIndex": 2,
+      "explanation": "[ISI PEMBAHASAN JAWABAN 3]",
+      "published": true
+    },
+    {
+      "id": "q-[ISI_NOMOR_STAGE]-4",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 4,
+      "type": "multiple-choice",
+      "question": "[ISI PERTANYAAN 4]",
+      "options": [
+        "[PILIHAN A]",
+        "[PILIHAN B]",
+        "[PILIHAN C]",
+        "[PILIHAN D]"
+      ],
+      "correctIndex": 3,
+      "explanation": "[ISI PEMBAHASAN JAWABAN 4]",
+      "published": true
+    },
+    {
+      "id": "q-[ISI_NOMOR_STAGE]-5",
+      "courseId": "[ISI_NOMOR_STAGE]",
+      "order": 5,
+      "type": "multiple-choice",
+      "question": "[ISI PERTANYAAN 5]",
+      "options": [
+        "[PILIHAN A]",
+        "[PILIHAN B]",
+        "[PILIHAN C]",
+        "[PILIHAN D]"
+      ],
+      "correctIndex": 0,
+      "explanation": "[ISI PEMBAHASAN JAWABAN 5]",
+      "published": true
+    }
+  ]
+}

@@ -650,12 +650,14 @@ export async function loadPublicData() {
   };
 }
 
-export async function loadLearningData() {
+export async function loadLearningData(options = {}) {
+  const includeMembers = options.includeMembers === true;
+
   const [courses, rewards, ranks, members, shopItems] = await Promise.all([
     getCollection('courses'),
     getCollection('rewards'),
     getCollection('ranks'),
-    getCollection('members'),
+    includeMembers ? getCollection('members') : Promise.resolve([]),
     getCollection('shopItems')
   ]);
 
@@ -673,6 +675,61 @@ export async function loadLearningData() {
     ),
     ranks: ranks.length ? sortByOrder(ranks) : seedRanks,
     members,
+    shopItems: sortByOrder(
+      shopItems
+        .map(normalizeShopItem)
+        .filter(Boolean)
+        .filter((item) => item.archived !== true)
+    )
+  };
+}
+
+function normalizePublicProfile(profile) {
+  if (!profile) return null;
+
+  return {
+    ...profile,
+    id: String(profile.id || profile.uid || ''),
+    uid: String(profile.uid || profile.id || ''),
+    name: String(profile.name || 'Anggota'),
+    cohort: String(profile.cohort || profile.letting || profile.angkatan || ''),
+    avatar: String(profile.avatar || '🧑‍💻'),
+    status: String(profile.status || 'pending'),
+    level: asNumber(profile.level, 1),
+    xp: asNumber(profile.xp, 0),
+    xpToNextLevel: asNumber(profile.xpToNextLevel, 100),
+    totalXp: asNumber(profile.totalXp || profile.xp, 0),
+    streak: asNumber(profile.streak, 0),
+    completedStages: Array.isArray(profile.completedStages) ? profile.completedStages : [],
+    passedStages: Array.isArray(profile.passedStages) ? profile.passedStages : [],
+    badges: Array.isArray(profile.badges) ? profile.badges : [],
+    ownedBadges: Array.isArray(profile.ownedBadges) ? profile.ownedBadges : [],
+    titles: Array.isArray(profile.titles) ? profile.titles : [],
+    ownedTitles: Array.isArray(profile.ownedTitles) ? profile.ownedTitles : [],
+    activeBadge: String(profile.activeBadge || ''),
+    activeTitle: String(profile.activeTitle || ''),
+    activeNameColor: String(profile.activeNameColor || ''),
+    activeNameColorItemId: String(profile.activeNameColorItemId || '')
+  };
+}
+
+export async function loadLeaderboardData() {
+  const [publicProfiles, rewards, shopItems] = await Promise.all([
+    getCollection('publicProfiles'),
+    getCollection('rewards'),
+    getCollection('shopItems')
+  ]);
+
+  return {
+    members: publicProfiles
+      .map(normalizePublicProfile)
+      .filter(Boolean)
+      .filter((profile) => profile.status === 'approved' || profile.status === 'active'),
+    rewards: sortByOrder(
+      mergeById(rewards, seedRewards)
+        .map(normalizeReward)
+        .filter(Boolean)
+    ),
     shopItems: sortByOrder(
       shopItems
         .map(normalizeShopItem)
@@ -1091,7 +1148,13 @@ export async function upsertChallengeSubmission(submission) {
     throw new Error('Data tantangan dan anggota tidak lengkap.');
   }
 
-  const existingSubmissions = await getCollection('challengeSubmissions');
+  // Member biasa tidak boleh membaca seluruh collection challengeSubmissions.
+  // Query ini dibatasi ke uid miliknya agar cocok dengan Firestore Rules owner-read.
+  const existingSubmissions = await getCollection('challengeSubmissions', {
+    where: [
+      { field: 'uid', operator: '==', value: String(normalized.uid) }
+    ]
+  });
   const duplicateSubmission = existingSubmissions.some((item) => {
     return (
       String(item.id) !== String(normalized.id) &&
@@ -2099,6 +2162,13 @@ export async function loadCertificates() {
     .sort((a, b) => String(b.issuedAt || '').localeCompare(String(a.issuedAt || '')));
 }
 
+export async function loadCertificateByCode(code) {
+  const cleanCode = String(code || '').trim().toUpperCase();
+  if (!cleanCode) return null;
+
+  return getDocument('certificates', cleanCode);
+}
+
 export async function issueCertificate(member, settings = {}) {
   const uid = getMemberUid(member);
 
@@ -2213,6 +2283,65 @@ export function analyzeSystemHealth(data = {}) {
 
     if (!sections.length) reports.push({ type: 'content', level: 'danger', message: `Stage ${course.stage || course.id} published tapi belum punya materi published.` });
     if (!courseQuestions.length) reports.push({ type: 'content', level: 'danger', message: `Stage ${course.stage || course.id} published tapi belum punya soal published.` });
+    if (courseQuestions.length > 0 && courseQuestions.length < 5) {
+      reports.push({ type: 'content', level: 'warning', message: `Stage ${course.stage || course.id} baru punya ${courseQuestions.length} soal. Rekomendasi minimal 5 soal.` });
+    }
+
+    const stageNumber = asNumber(course.stage || course.order || course.id, 0);
+    const expectedRarity = stageNumber >= 30
+      ? 'mythic'
+      : stageNumber >= 22
+        ? 'epic'
+        : stageNumber >= 15
+          ? 'rare'
+          : '';
+
+    if (expectedRarity) {
+      if (course.badgeRewardEnabled && String(course.badgeRarity || '').toLowerCase() !== expectedRarity) {
+        reports.push({ type: 'reward', level: 'warning', message: `Stage ${stageNumber} badge rarity sebaiknya ${expectedRarity}, sekarang ${course.badgeRarity || '-'}.` });
+      }
+
+      if (course.titleRewardEnabled && String(course.titleRewardRarity || '').toLowerCase() !== expectedRarity) {
+        reports.push({ type: 'reward', level: 'warning', message: `Stage ${stageNumber} title rarity sebaiknya ${expectedRarity}, sekarang ${course.titleRewardRarity || '-'}.` });
+      }
+    }
+
+    const sectionKeys = new Map();
+    sections.forEach((section) => {
+      const key = `${String(section.courseId)}::${String(section.type || section.order)}`;
+      const oldItems = sectionKeys.get(key) || [];
+      sectionKeys.set(key, [...oldItems, section.id]);
+
+      if (!String(section.content || '').trim()) {
+        reports.push({ type: 'content', level: 'danger', message: `Stage ${course.stage || course.id} materi ${section.title || section.type || section.order} belum punya isi.` });
+      }
+
+      if (!String(section.checkpoint || '').trim()) {
+        reports.push({ type: 'content', level: 'warning', message: `Stage ${course.stage || course.id} materi ${section.title || section.type || section.order} belum punya checkpoint.` });
+      }
+    });
+    sectionKeys.forEach((ids, key) => {
+      if (ids.length > 1) {
+        reports.push({
+          type: 'content',
+          level: 'warning',
+          message: `Stage ${course.stage || course.id} punya materi duplikat untuk ${key.split('::')[1]}: ${ids.join(', ')}.`
+        });
+      }
+    });
+
+    courseQuestions.forEach((question) => {
+      const options = Array.isArray(question.options) ? question.options : [];
+      if (!String(question.explanation || '').trim()) {
+        reports.push({ type: 'content', level: 'warning', message: `Stage ${course.stage || course.id} soal ${question.order || question.id} belum punya pembahasan.` });
+      }
+      if (options.length !== 4 || options.some((option) => !String(option || '').trim())) {
+        reports.push({ type: 'content', level: 'warning', message: `Stage ${course.stage || course.id} soal ${question.order || question.id} pilihan jawabannya belum lengkap.` });
+      }
+      if (![0, 1, 2, 3].includes(Number(question.correctIndex))) {
+        reports.push({ type: 'content', level: 'danger', message: `Stage ${course.stage || course.id} soal ${question.order || question.id} correctIndex tidak valid.` });
+      }
+    });
   });
 
   return {
@@ -2269,6 +2398,11 @@ export async function importLearningContent(jsonText) {
     } catch (error) {
       throw new Error('File konten bukan JSON valid.');
     }
+  }
+
+  const jsonString = JSON.stringify(parsed || {});
+  if (/\[ISI[^\]]*\]/i.test(jsonString)) {
+    throw new Error('Template import masih berisi placeholder [ISI ...]. Lengkapi dulu semua data stage sebelum import.');
   }
 
   const allowed = ['courses', 'courseSections', 'questions'];

@@ -75,6 +75,39 @@ export function createStageChest(course) {
   };
 }
 
+export function getStageRewardPreview(course = {}) {
+  const rewards = [];
+
+  if (course.badgeRewardEnabled && course.badgeId) {
+    rewards.push({
+      type: 'badge',
+      id: course.badgeId,
+      name: course.badgeName || course.badgeId,
+      icon: course.badgeIcon || '🏅'
+    });
+  }
+
+  if (course.titleRewardEnabled && course.titleRewardId) {
+    rewards.push({
+      type: 'title',
+      id: course.titleRewardId,
+      name: course.titleRewardName || course.titleRewardId,
+      icon: course.titleRewardIcon || '🎖️'
+    });
+  }
+
+  if (shouldGiveChest(course)) {
+    rewards.push({
+      type: 'chest',
+      id: course.chestId || `stage-${Number(course.id || course.stage || 0)}-chest`,
+      name: course.chestName || `Chest Stage ${Number(course.id || course.stage || 0)}`,
+      icon: course.chestIcon || '🎁'
+    });
+  }
+
+  return rewards;
+}
+
 export function applyCourseCompletion(member, course) {
   const courseId = Number(course.id || course.stage || course.order || 0);
   const completedCourses = new Set(
@@ -230,8 +263,7 @@ export function applyQuizPass(member, course, result) {
     streak: nextMember.streak,
     lastStudyDate: nextMember.lastStudyDate,
     activeBadge: member.activeBadge || (stageRewards.find((item) => item.type === 'badge')?.id || ''),
-    activeTitle: member.activeTitle || (stageRewards.find((item) => item.type === 'title')?.id || ''),
-    lastStageRewards: stageRewards
+    activeTitle: member.activeTitle || (stageRewards.find((item) => item.type === 'title')?.id || '')
   };
 }
 

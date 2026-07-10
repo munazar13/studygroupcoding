@@ -8,6 +8,7 @@ import {
   signInAdmin,
   sendMemberPasswordReset,
   signInMember,
+  syncMemberPublicProfile,
   updateMember
 } from '../services/firebase';
 
@@ -97,6 +98,19 @@ export function AuthProvider({ children }) {
   const [currentMember, setCurrentMember] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
 
+  async function setAndSyncMember(member) {
+    const normalized = normalizeMember(member);
+    setCurrentMember(normalized);
+
+    if (normalized?.uid && normalized.status === 'approved') {
+      syncMemberPublicProfile(normalized).catch((error) => {
+        console.warn('Gagal memperbarui profil publik leaderboard:', error);
+      });
+    }
+
+    return normalized;
+  }
+
   useEffect(() => {
     const unsubscribe = listenToAuth(async (user) => {
       setFirebaseUser(user);
@@ -109,7 +123,7 @@ export function AuthProvider({ children }) {
 
       try {
         const member = await getMember(user.uid);
-        setCurrentMember(normalizeMember(member));
+        await setAndSyncMember(member);
       } catch (error) {
         console.error('Gagal mengambil data anggota.', error);
         setCurrentMember(null);
@@ -128,9 +142,7 @@ export function AuthProvider({ children }) {
     }
 
     const member = await getMember(firebaseUser.uid);
-    const normalized = normalizeMember(member);
-    setCurrentMember(normalized);
-    return normalized;
+    return setAndSyncMember(member);
   }
 
   async function loginMember(nim, password) {
@@ -141,8 +153,7 @@ export function AuthProvider({ children }) {
       throw new Error('Akun ditemukan, tetapi profil anggota belum dibuat. Hubungi pengurus.');
     }
 
-    setCurrentMember(normalizeMember(member));
-    return normalizeMember(member);
+    return setAndSyncMember(member);
   }
 
   async function loginAdmin(identifier, password) {
@@ -159,14 +170,12 @@ export function AuthProvider({ children }) {
       throw new Error('Akun admin belum aktif.');
     }
 
-    setCurrentMember(normalizeMember(member));
-    return normalizeMember(member);
+    return setAndSyncMember(member);
   }
 
   async function registerMember(payload) {
     const member = await createMemberAccount(payload);
-    setCurrentMember(normalizeMember(member));
-    return normalizeMember(member);
+    return setAndSyncMember(member);
   }
 
   async function resetMemberPassword(identifier) {

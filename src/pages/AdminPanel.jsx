@@ -7,6 +7,7 @@ import AdminPreviewContent from '../components/AdminPreviewContent';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { FIXED_MATERIAL_SECTIONS } from '../data/fixedMaterialSections';
+import learningStageImportTemplate from '../data/learningStageImportTemplate.json';
 import {
   approveChallengeSubmission,
   rejectChallengeSubmission,
@@ -135,6 +136,11 @@ const emptyCourse = {
   title: '',
   area: '',
   theme: '',
+  taskTitle: '',
+  taskDescription: '',
+  playgroundHtml: '',
+  playgroundCss: '',
+  playgroundJs: '',
   minScore: 70,
   xpReward: 100,
   coinReward: 25,
@@ -390,6 +396,9 @@ export default function AdminPanel() {
   const [certificateReviewNotes, setCertificateReviewNotes] = useState({});
   const [mediaAssets, setMediaAssets] = useState([]);
   const [mediaForm, setMediaForm] = useState({ title: '', dataUrl: '', fileName: '', mimeType: '', size: 0 });
+  const [learningImportFile, setLearningImportFile] = useState(null);
+  const [learningImportBusy, setLearningImportBusy] = useState(false);
+  const [learningImportInputKey, setLearningImportInputKey] = useState(0);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [savingCompleteStage, setSavingCompleteStage] = useState(false);
   const [savingMaterials, setSavingMaterials] = useState(false);
@@ -428,7 +437,7 @@ export default function AdminPanel() {
       mediaResult
     ] = await Promise.all([
       loadPublicData(),
-      loadLearningData(),
+      loadLearningData({ includeMembers: true }),
       loadAdminContentData(),
       loadChallengeData(),
       loadAnnouncements({ includeDrafts: true }),
@@ -986,8 +995,20 @@ published: selectedCourse.published !== false
 
 function createCodeSnippet(language = 'php') {
   const fence = String.fromCharCode(96).repeat(3);
+  const labels = {
+    php: 'PHP',
+    html: 'HTML',
+    css: 'CSS',
+    js: 'JavaScript',
+    javascript: 'JavaScript',
+    sql: 'SQL',
+    json: 'JSON',
+    txt: 'text',
+    text: 'text'
+  };
+  const label = labels[String(language || '').toLowerCase()] || String(language || 'text');
 
-  return `${fence}${language}
+  return `${fence}${label}
 
 ${fence}`;
 }
@@ -2265,30 +2286,67 @@ async function handleExportLearningContent() {
   showToast('Konten belajar berhasil diexport.');
 }
 
-async function handleImportLearningContent(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
+function handleDownloadLearningImportTemplate() {
+  downloadTextFile(
+    'template-import-1-stage-study-group-coding.json',
+    JSON.stringify(learningStageImportTemplate, null, 2)
+  );
+  showToast('Template import 1 stage berhasil diunduh. Isi placeholder sebelum import.');
+}
 
-  const confirmed = confirmDangerAction({
-    title: 'Import konten belajar',
-    message: 'Data courses, courseSections, dan questions dengan ID sama akan ditimpa.',
-    confirmation: 'RESTORE'
-  });
+function handleSelectLearningImportFile(event) {
+  const file = event.target.files?.[0] || null;
 
-  if (!confirmed) {
-    event.target.value = '';
+  if (!file) {
+    setLearningImportFile(null);
     return;
   }
 
+  const fileName = String(file.name || '').toLowerCase();
+  const isJsonFile = fileName.endsWith('.json') || file.type === 'application/json';
+
+  if (!isJsonFile) {
+    showToast('Pilih file JSON konten belajar terlebih dahulu.', 'error');
+    setLearningImportFile(null);
+    setLearningImportInputKey((value) => value + 1);
+    return;
+  }
+
+  setLearningImportFile(file);
+}
+
+function handleCancelLearningImportFile() {
+  setLearningImportFile(null);
+  setLearningImportInputKey((value) => value + 1);
+}
+
+async function handleImportLearningContent() {
+  if (!learningImportFile) {
+    showToast('Pilih file JSON konten belajar dulu sebelum import.', 'error');
+    return;
+  }
+
+  const confirmed = confirmDangerAction({
+    title: 'Import konten belajar',
+    message: `File yang akan diimport: ${learningImportFile.name}. Data courses, courseSections, dan questions dengan ID sama akan ditimpa.`,
+    confirmation: 'RESTORE'
+  });
+
+  if (!confirmed) return;
+
+  setLearningImportBusy(true);
+
   try {
-    const text = await file.text();
+    const text = await learningImportFile.text();
     const count = await importLearningContent(text);
     showToast(`${count} dokumen konten berhasil diimport.`);
+    setLearningImportFile(null);
+    setLearningImportInputKey((value) => value + 1);
     await reload();
   } catch (error) {
     showToast(error.message || 'Import konten gagal.', 'error');
   } finally {
-    event.target.value = '';
+    setLearningImportBusy(false);
   }
 }
 
@@ -3118,6 +3176,65 @@ async function handleDeleteMedia(assetId) {
       value={courseForm.theme}
       onChange={(e) => setCourseForm({ ...courseForm, theme: e.target.value })}
     />
+
+    <div className="content-editor-section stage-task-admin-box">
+      <div className="section-title-row">
+        <h3>Tugas Stage & Playground</h3>
+        <span>Ditampilkan di akhir materi</span>
+      </div>
+      <p className="form-help">
+        Isi tugas akhir stage di sini. Playground output langsung hanya menjalankan HTML, CSS, dan JavaScript di browser. Untuk PHP, tetap gunakan materi/quiz atau environment lokal/server.
+      </p>
+
+      <label className="form-field">
+        <span>Judul Tugas</span>
+        <input
+          placeholder="Contoh: Tugas Stage 17 - Styling Form"
+          value={courseForm.taskTitle}
+          onChange={(e) => setCourseForm({ ...courseForm, taskTitle: e.target.value })}
+        />
+      </label>
+
+      <label className="form-field">
+        <span>Deskripsi / Instruksi Tugas</span>
+        <textarea
+          className="large-textarea"
+          placeholder="Tulis tugas yang harus dikerjakan anggota setelah membaca semua materi stage ini."
+          value={courseForm.taskDescription}
+          onChange={(e) => setCourseForm({ ...courseForm, taskDescription: e.target.value })}
+        />
+      </label>
+
+      <div className="form-row">
+        <label className="form-field">
+          <span>Kode Awal HTML</span>
+          <textarea
+            placeholder="<section>...</section>"
+            value={courseForm.playgroundHtml}
+            onChange={(e) => setCourseForm({ ...courseForm, playgroundHtml: e.target.value })}
+          />
+        </label>
+
+        <label className="form-field">
+          <span>Kode Awal CSS</span>
+          <textarea
+            placeholder=".card { padding: 16px; }"
+            value={courseForm.playgroundCss}
+            onChange={(e) => setCourseForm({ ...courseForm, playgroundCss: e.target.value })}
+          />
+        </label>
+      </div>
+
+      <label className="form-field">
+        <span>Kode Awal JavaScript</span>
+        <textarea
+          placeholder="const tombol = document.querySelector('button');"
+          value={courseForm.playgroundJs}
+          onChange={(e) => setCourseForm({ ...courseForm, playgroundJs: e.target.value })}
+        />
+      </label>
+    </div>
+
     <div className="form-row">
       <input
         required
@@ -3582,7 +3699,7 @@ async function handleDeleteMedia(assetId) {
 
       <textarea
         required
-        placeholder="Checkpoint / ringkasan kecil sebelum lanjut"
+        placeholder="Checkpoint berupa pertanyaan konsep. Contoh: Apa fungsi utama konsep ini, dan bagaimana cara menerapkannya pada contoh sederhana?"
         value={section.checkpoint}
         onChange={(e) => updateSectionForms(index, 'checkpoint', e.target.value)}
       />
@@ -5166,9 +5283,66 @@ async function handleDeleteMedia(assetId) {
       ) : null}
 
       {activeTab === 'content-tools' ? (
-        <section className="two-column">
-          <PixelCard><h2>Export Konten Belajar</h2><p>Export hanya courses, courseSections, dan questions.</p><PixelButton type="button" onClick={handleExportLearningContent}>Export Konten</PixelButton></PixelCard>
-          <PixelCard><h2>Import Konten Belajar</h2><p>Import JSON konten belajar. Gunakan file dari export konten.</p><input type="file" accept="application/json,.json" onChange={handleImportLearningContent} /></PixelCard>
+        <section className="content-tools-grid">
+          <PixelCard>
+            <h2>Export Konten Belajar</h2>
+            <p>Export semua courses, courseSections, dan questions yang ada di Firestore. Gunakan ini untuk backup sebelum edit besar.</p>
+            <PixelButton type="button" onClick={handleExportLearningContent}>Export Konten</PixelButton>
+          </PixelCard>
+
+          <PixelCard>
+            <h2>Template Import 1 Stage</h2>
+            <p>Unduh template yang sudah mengikuti form materi sekarang: 1 course, 6 materi tetap, dan 5 soal pilihan ganda.</p>
+            <PixelButton type="button" variant="secondary" onClick={handleDownloadLearningImportTemplate}>Download Template Import</PixelButton>
+            <div className="admin-template-note">
+              <strong>Catatan:</strong>
+              <p>Isi semua placeholder [ISI ...], samakan id course dengan courseId, lalu import file JSON-nya dari kartu sebelah.</p>
+            </div>
+          </PixelCard>
+
+          <PixelCard>
+            <h2>Import Konten Belajar</h2>
+            <p>Import JSON konten belajar. Data dengan ID sama akan ditimpa. Cocok untuk memasukkan stage dari template.</p>
+            <div className="admin-template-note">
+              <strong>Alur import:</strong>
+              <p>Pilih file JSON dulu, cek nama file yang muncul, lalu klik tombol Import Konten. Import tidak berjalan otomatis saat file baru dipilih.</p>
+            </div>
+            <input
+              key={learningImportInputKey}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleSelectLearningImportFile}
+              disabled={learningImportBusy}
+            />
+            {learningImportFile ? (
+              <div className="admin-template-note">
+                <strong>File siap diimport:</strong>
+                <p>{learningImportFile.name}</p>
+              </div>
+            ) : (
+              <div className="admin-template-note">
+                <strong>Belum ada file dipilih.</strong>
+                <p>Tombol import sengaja tetap terlihat, tetapi aktif setelah file JSON dipilih.</p>
+              </div>
+            )}
+            <div className="admin-form-actions">
+              <PixelButton
+                type="button"
+                onClick={handleImportLearningContent}
+                disabled={!learningImportFile || learningImportBusy}
+              >
+                {learningImportBusy ? 'Mengimport...' : 'Import Konten'}
+              </PixelButton>
+              <PixelButton
+                type="button"
+                variant="secondary"
+                onClick={handleCancelLearningImportFile}
+                disabled={!learningImportFile || learningImportBusy}
+              >
+                Batal Pilih File
+              </PixelButton>
+            </div>
+          </PixelCard>
         </section>
       ) : null}
 

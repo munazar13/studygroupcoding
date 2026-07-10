@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import LoadingState from '../components/LoadingState';
 import MemberName from '../components/MemberName';
 import PixelCard from '../components/PixelCard';
-import { loadLearningData } from '../services/dataApi';
+import { useAuth } from '../context/AuthContext';
+import { loadLeaderboardData } from '../services/dataApi';
 import { findCosmeticById } from '../utils/cosmetics';
 import { getXpPercent } from '../utils/levelSystem';
 import { getRarityClassName, getRarityLabel } from '../utils/rarity';
@@ -16,7 +17,11 @@ const tabs = [
 
 function getCompletedStageCount(member) {
   const completedStages = member.completedStages || member.passedStages || [];
-  return completedStages.length;
+  if (Array.isArray(completedStages) && completedStages.length) {
+    return completedStages.length;
+  }
+
+  return Number(member.completedStageCount || member.stageCompleted || 0);
 }
 
 function getOwnedBadgeIds(member) {
@@ -85,8 +90,17 @@ function formatLetting(member = {}) {
   return `Letting ${letting}`;
 }
 
+function getMemberId(member = {}) {
+  return String(member.uid || member.id || member.memberId || '').trim();
+}
+
+function isApprovedForLeaderboard(member = {}) {
+  return member.role === 'admin' || member.status === 'approved' || member.status === 'active';
+}
+
 
 export default function Leaderboard() {
+  const { currentMember } = useAuth();
   const [members, setMembers] = useState([]);
   const [rewards, setRewards] = useState([]);
   const [shopItems, setShopItems] = useState([]);
@@ -94,17 +108,46 @@ export default function Leaderboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadLearningData()
+    loadLeaderboardData()
       .then((data) => {
-        setMembers((data.members || []).filter((member) => member.status === 'approved'));
+        setMembers((data.members || []).filter(isApprovedForLeaderboard));
         setRewards(data.rewards || []);
         setShopItems(data.shopItems || []);
       })
       .finally(() => setLoading(false));
   }, []);
 
+  const leaderboardMembers = useMemo(() => {
+    const baseMembers = [...members];
+    const currentId = getMemberId(currentMember);
+
+    if (!currentId || !isApprovedForLeaderboard(currentMember)) {
+      return baseMembers;
+    }
+
+    const currentLeaderboardProfile = {
+      ...currentMember,
+      id: currentId,
+      uid: currentId,
+      status: currentMember.status || 'approved'
+    };
+
+    const currentIndex = baseMembers.findIndex((member) => getMemberId(member) === currentId);
+
+    if (currentIndex >= 0) {
+      baseMembers[currentIndex] = {
+        ...baseMembers[currentIndex],
+        ...currentLeaderboardProfile
+      };
+    } else {
+      baseMembers.push(currentLeaderboardProfile);
+    }
+
+    return baseMembers;
+  }, [currentMember, members]);
+
   const rankedMembers = useMemo(() => {
-    const sorted = [...members];
+    const sorted = [...leaderboardMembers];
 
     if (activeTab === 'main') {
       return sorted.sort(compareMainRank);
@@ -141,7 +184,15 @@ export default function Leaderboard() {
     }
 
     return sorted;
-  }, [activeTab, members]);
+  }, [activeTab, leaderboardMembers]);
+
+  const currentMemberId = getMemberId(currentMember);
+  const topRankedMembers = rankedMembers.slice(0, 10);
+  const currentRankIndex = currentMemberId
+    ? rankedMembers.findIndex((member) => getMemberId(member) === currentMemberId)
+    : -1;
+  const currentRankMember = currentRankIndex >= 0 ? rankedMembers[currentRankIndex] : null;
+  const currentInTopTen = currentRankIndex >= 0 && currentRankIndex < 10;
 
   function getMainScore(member) {
     if (activeTab === 'main') {
@@ -164,6 +215,69 @@ export default function Leaderboard() {
     if (index === 1) return '🥈';
     if (index === 2) return '🥉';
     return `#${index + 1}`;
+  }
+
+  function renderLeaderRow(member, index, { currentUser = false, compact = false } = {}) {
+    const activeBadge = findCosmeticById({ rewards, shopItems, member, id: member.activeBadge, type: 'badge' });
+    const activeTitle = findCosmeticById({ rewards, shopItems, member, id: member.activeTitle, type: 'title' });
+
+    return (
+      <PixelCard className={[`leader-row-v2 rank-${index + 1}`, currentUser ? 'current-user' : '', compact ? 'compact' : ''].filter(Boolean).join(' ')} key={`${getMemberId(member) || member.name}-${index}`}>
+        <div className="leader-rank">
+          {getRankMedal(index)}
+        </div>
+
+        <div className="leader-avatar">
+          {member.avatar || '🧑‍💻'}
+        </div>
+
+        <div className="leader-info">
+          <div className="leader-name-row">
+            <h3><MemberName member={member} shopItems={shopItems} /></h3>
+            {currentUser ? <span className="your-rank-chip">Kamu</span> : null}
+            <p className="leader-letting">
+              {formatLetting(member)}
+            </p>
+
+            {activeBadge ? (
+              <span className={`leader-badge-pill ${getRarityClassName(activeBadge.rarity || 'common')}`}>
+                <span>🏅 {getRewardName(activeBadge)}</span>
+                <small>{getRarityLabel(activeBadge.rarity || 'common')}</small>
+              </span>
+            ) : null}
+          </div>
+
+          <p>
+            {activeTitle ? (
+              <span className={`leader-title-pill ${getRarityClassName(activeTitle.rarity || 'common')}`}>
+                <span>🎖️ {getRewardName(activeTitle)}</span>
+                <small>{getRarityLabel(activeTitle.rarity || 'common')}</small>
+              </span>
+            ) : (
+              <span>Belum memakai title</span>
+            )}
+          </p>
+
+          <div className="leader-level-line">
+            <span>Level {member.level || 1}</span>
+            {'  '}
+            <span>{Number(member.xp || 0)}/{Number(member.xpToNextLevel || 100)} XP</span>
+          </div>
+
+          <div className="pixel-progress">
+            <span style={{ width: `${getXpPercent(member)}%` }} />
+          </div>
+
+          <small>
+            Stage selesai {getCompletedStageCount(member)}/32 · Badge {getOwnedBadgeIds(member).length} · Title {getOwnedTitleIds(member).length}
+          </small>
+        </div>
+
+        <strong className="leader-score">
+          {getMainScore(member)}
+        </strong>
+      </PixelCard>
+    );
   }
 
   if (loading) {
@@ -194,75 +308,45 @@ export default function Leaderboard() {
         ))}
       </div>
 
+      <section className="leaderboard-overview-grid">
+        <PixelCard className="leaderboard-summary-card">
+          <p className="eyebrow">10 Besar</p>
+          <h2>Rank 1 sampai 10</h2>
+          <p>Menampilkan sepuluh anggota teratas pada kategori yang sedang dipilih.</p>
+        </PixelCard>
+        <PixelCard className="leaderboard-summary-card current-rank-summary">
+          <p className="eyebrow">Peringkat Kamu</p>
+          {currentRankMember ? (
+            <>
+              <h2>#{currentRankIndex + 1}</h2>
+              <p>{currentInTopTen ? 'Kamu sedang masuk 10 besar. Pertahankan ritmenya.' : 'Kamu belum masuk 10 besar, tapi posisimu tetap tercatat di bawah.'}</p>
+            </>
+          ) : (
+            <>
+              <h2>Belum tercatat</h2>
+              <p>Login sebagai member approved dan selesaikan aktivitas belajar agar profil publikmu masuk leaderboard.</p>
+            </>
+          )}
+        </PixelCard>
+      </section>
+
       <section className="leaderboard-list">
-        {rankedMembers.length ? rankedMembers.map((member, index) => {
-          const xpPercent = getXpPercent(member);
-          const activeBadge = findCosmeticById({ rewards, shopItems, member, id: member.activeBadge, type: 'badge' });
-          const activeTitle = findCosmeticById({ rewards, shopItems, member, id: member.activeTitle, type: 'title' });
-
-          return (
-            <PixelCard className={`leader-row-v2 rank-${index + 1}`} key={member.uid}>
-              <div className="leader-rank">
-                {getRankMedal(index)}
-              </div>
-
-              <div className="leader-avatar">
-                {member.avatar || '🧑‍💻'}
-              </div>
-
-              <div className="leader-info">
-                <div className="leader-name-row">
-                  <h3><MemberName member={member} shopItems={shopItems} /></h3>
-                  <p className="leader-letting">
-                  {formatLetting(member)}
-                  </p>
-
-                  {activeBadge ? (
-                    <span className={`leader-badge-pill ${getRarityClassName(activeBadge.rarity || 'common')}`}>
-                      <span>🏅 {getRewardName(activeBadge)}</span>
-                      <small>{getRarityLabel(activeBadge.rarity || 'common')}</small>
-                    </span>
-                  ) : null}
-                </div>
-
-                <p>
-                  {activeTitle ? (
-                   <span className={`leader-title-pill ${getRarityClassName(activeTitle.rarity || 'common')}`}>
-                      <span>🎖️ {getRewardName(activeTitle)}</span>
-                      <small>{getRarityLabel(activeTitle.rarity || 'common')}</small>
-                    </span>
-                  ) : (
-                    <span>Belum memakai title</span>
-                  )}
-                </p>
-
-                <div className="leader-level-line">
-                  <span>Level {member.level || 1}</span>
-                  {"  "}
-                  <span>{Number(member.xp || 0)}/{Number(member.xpToNextLevel || 100)} XP</span>
-                </div>
-
-                <div className="pixel-progress">
-                  <span style={{ width: `${xpPercent}%` }} />
-                </div>
-
-                <small>
-                  Stage selesai {getCompletedStageCount(member)}/32 · Badge {getOwnedBadgeIds(member).length} · Title {getOwnedTitleIds(member).length}
-                </small>
-              </div>
-
-              <strong className="leader-score">
-                {getMainScore(member)}
-              </strong>
-            </PixelCard>
-          );
-        }) : (
+        {topRankedMembers.length ? topRankedMembers.map((member, index) => (
+          renderLeaderRow(member, index, { currentUser: getMemberId(member) === currentMemberId })
+        )) : (
           <PixelCard className="empty-state">
             <h3>Belum ada anggota di leaderboard</h3>
             <p>Ranking akan tampil setelah pengurus menyetujui anggota.</p>
           </PixelCard>
         )}
       </section>
+
+      {currentRankMember && !currentInTopTen ? (
+        <section className="leaderboard-current-rank">
+          <p className="eyebrow">Posisi Kamu</p>
+          {renderLeaderRow(currentRankMember, currentRankIndex, { currentUser: true, compact: true })}
+        </section>
+      ) : null}
 
       <PixelCard className="leaderboard-note">
         <h3>Aturan Ranking</h3>
